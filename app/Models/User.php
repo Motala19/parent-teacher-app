@@ -23,6 +23,8 @@ class User extends Authenticatable
         'password',
         'phone',
         'school_id',
+        'is_smt',
+        'position',
     ];
 
     protected $hidden = [
@@ -31,12 +33,16 @@ class User extends Authenticatable
     ];
 
     protected $casts = [
-        'email_verified_at' => 'datetime',
-        'password' => 'hashed',
+        'email_notifications' => 'boolean',
+        'email_verified_at'   => 'datetime',
+        'password'            => 'hashed',
+        'is_smt'              => 'boolean',
+        'invited_at'          => 'datetime',
+        
     ];
 
     /* ---------------------------------------------------------
-       Phone and email helpers
+       Phone, email and role helpers
        --------------------------------------------------------- */
 
     // Turns 082 123 4567 and +27821234567 into the same value
@@ -65,6 +71,12 @@ class User extends Authenticatable
         return str_ends_with((string) $this->email, '@noemail.invalid') ? null : $this->email;
     }
 
+    // True only if the person has not switched emails off AND has a real email address
+    public function wantsEmail(): bool
+    {
+        return (bool) ($this->email_notifications ?? true) && $this->realEmail() !== null;
+    }
+
     public function roleLabel(): string
     {
         return match (true) {
@@ -79,6 +91,15 @@ class User extends Authenticatable
     public function isStaff(): bool
     {
         return $this->hasAnyRole(['teacher', 'school-admin']);
+
+    }
+
+    public const SMT_POSITIONS = ['Principal', 'Deputy Principal', 'Head of Department', 'Other SMT member'];
+
+    // Teachers flagged as School Management Team members
+    public function scopeSmtMembers($query)
+    {
+        return $query->role('teacher')->where('users.is_smt', true);
     }
 
     /* ---------------------------------------------------------
@@ -98,7 +119,7 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
-    // Teachers <-> Classes
+    // Classes this teacher is the CLASS TEACHER of
     public function classes(): BelongsToMany
     {
         return $this->belongsToMany(ClassRoom::class, 'class_user', 'user_id', 'class_id')
@@ -106,7 +127,7 @@ class User extends Authenticatable
                     ->withTimestamps();
     }
 
-    // Subjects this teacher teaches (in any class)
+    // Subjects this teacher teaches (one row per class they teach it in)
     public function teachingSubjects(): BelongsToMany
     {
         return $this->belongsToMany(Subject::class, 'class_subject', 'teacher_id', 'subject_id')
@@ -192,29 +213,89 @@ class User extends Authenticatable
     }
 
     /* ---------------------------------------------------------
-       Teachers: their classes
+       TEACHERS
+       Class teacher  = a row in class_user (owns the class)
+       Subject teacher = rows in class_subject (teaches a subject in a class,
+                         linked only to the learners who take that subject)
        --------------------------------------------------------- */
 
-    // Classes this teacher is linked to, as class teacher or as a subject teacher
+    // Classes this teacher is the class teacher of
     public function myClasses()
     {
-        return ClassRoom::where('school_id', $this->school_id)->where(function ($q) {
-            $q->whereIn('id', DB::table('class_user')->where('user_id', $this->id)->select('class_id'))
-              ->orWhereIn('id', DB::table('class_subject')->where('teacher_id', $this->id)->select('class_id'));
-        });
+        return ClassRoom::where('classes.school_id', $this->school_id)
+            ->whereIn('classes.id', DB::table('class_user')->where('user_id', $this->id)->select('class_id'));
     }
 
-    // Only teachers linked through class_user may add or remove learners
+    public function isClassTeacher(): bool
+    {
+        return DB::table('class_user')->where('user_id', $this->id)->exists();
+    }
+
+    public function isClassTeacherOf(int $classId): bool
+    {
+        return DB::table('class_user')->where('user_id', $this->id)->where('class_id', $classId)->exists();
+    }
+
+    // Only class teachers may add or remove learners
     public function managesClass(ClassRoom $class): bool
     {
-        return DB::table('class_user')
-            ->where('user_id', $this->id)
-            ->where('class_id', $class->id)
+        return $this->isClassTeacherOf($class->id);
+    }
+
+    // The class + subject pairs assigned to this teacher (active subjects and classes only)
+    public function subjectAssignments()
+    {
+        return ClassSubject::query()
+            ->where('class_subject.teacher_id', $this->id)
+            ->whereHas('subject', fn ($q) => $q->where('subjects.is_active', true)->where('subjects.school_id', $this->school_id))
+            ->whereHas('classRoom', fn ($q) => $q->where('classes.is_active', true)->where('classes.school_id', $this->school_id));
+    }
+
+    public function teachesSubjectIn(int $classId, int $subjectId): bool
+    {
+        return DB::table('class_subject')
+            ->where('teacher_id', $this->id)
+            ->where('class_id', $classId)
+            ->where('subject_id', $subjectId)
             ->exists();
     }
 
+    // Class teacher of the class, or teaches any subject in it
+    public function teachesInClass(int $classId): bool
+    {
+        return $this->isClassTeacherOf($classId)
+            || DB::table('class_subject')->where('teacher_id', $this->id)->where('class_id', $classId)->exists();
+    }
+
+    // Every class this teacher is connected to, in either way (used for filters)
+    public function involvedClasses()
+    {
+        return ClassRoom::where('classes.school_id', $this->school_id)->where(function ($q) {
+            $q->whereIn('classes.id', DB::table('class_user')->where('user_id', $this->id)->select('class_id'))
+              ->orWhereIn('classes.id', DB::table('class_subject')->where('teacher_id', $this->id)->select('class_id'));
+        });
+    }
+
+    // Every learner this teacher teaches:
+    //  - the whole class, if they are its class teacher
+    //  - otherwise only the learners who take the subject they teach in that class
+    public function myStudents()
+    {
+        return Student::where('students.school_id', $this->school_id)->where(function ($q) {
+            $q->whereIn('students.class_id', DB::table('class_user')->where('user_id', $this->id)->select('class_id'))
+              ->orWhereExists(function ($sub) {
+                  $sub->select(DB::raw(1))
+                      ->from('class_subject')
+                      ->join('student_subject', 'student_subject.subject_id', '=', 'class_subject.subject_id')
+                      ->whereColumn('class_subject.class_id', 'students.class_id')
+                      ->whereColumn('student_subject.student_id', 'students.id')
+                      ->where('class_subject.teacher_id', $this->id);
+              });
+        });
+    }
+
     /* ---------------------------------------------------------
-       Messaging rules
+       MESSAGING RULES
        --------------------------------------------------------- */
 
     // Colleagues: other teachers and school admins at the same school
@@ -225,8 +306,7 @@ class User extends Authenticatable
             ->where('users.id', '!=', $this->id);
     }
 
-    // Parents this teacher may message (a child in one of their classes).
-    // A school admin may message every parent at the school.
+    // Parents of the learners this teacher teaches. A school admin may message every parent.
     public function messageableParents()
     {
         $query = static::role('parent')->where('users.school_id', $this->school_id);
@@ -235,27 +315,33 @@ class User extends Authenticatable
             return $query;
         }
 
-        $classIds = $this->myClasses()->pluck('id');
-
-        return $query->whereHas('children', fn ($q) => $q->whereIn('students.class_id', $classIds));
+        return $query->whereHas('children', function ($q) {
+            $q->whereIn('students.id', $this->myStudents()->select('students.id'));
+        });
     }
 
-    // For a parent: their child's teachers, plus the school admin(s)
+    // For a parent: the class teacher, the teachers of the subjects their child takes, and the school office
     public function messageableSchoolStaff()
     {
-        $classIds = $this->children()
-            ->whereNotNull('students.class_id')
-            ->pluck('students.class_id')
-            ->unique();
+        $childIds = $this->children()->pluck('students.id');
+        $classIds = $this->children()->whereNotNull('students.class_id')->pluck('students.class_id')->unique();
 
         return static::where('users.school_id', $this->school_id)
-            ->where(function ($q) use ($classIds) {
+            ->where(function ($q) use ($classIds, $childIds) {
                 $q->whereHas('roles', fn ($r) => $r->where('name', 'school-admin'))
-                  ->orWhere(function ($t) use ($classIds) {
+                  ->orWhere(function ($t) use ($classIds, $childIds) {
                       $t->whereHas('roles', fn ($r) => $r->where('name', 'teacher'))
-                        ->where(function ($x) use ($classIds) {
+                        ->where(function ($x) use ($classIds, $childIds) {
                             $x->whereIn('users.id', DB::table('class_user')->whereIn('class_id', $classIds)->select('user_id'))
-                              ->orWhereIn('users.id', DB::table('class_subject')->whereIn('class_id', $classIds)->whereNotNull('teacher_id')->select('teacher_id'));
+                              ->orWhereExists(function ($sub) use ($childIds) {
+                                  $sub->select(DB::raw(1))
+                                      ->from('class_subject')
+                                      ->join('student_subject', 'student_subject.subject_id', '=', 'class_subject.subject_id')
+                                      ->join('students', 'students.id', '=', 'student_subject.student_id')
+                                      ->whereColumn('class_subject.teacher_id', 'users.id')
+                                      ->whereColumn('class_subject.class_id', 'students.class_id')
+                                      ->whereIn('student_subject.student_id', $childIds);
+                              });
                         });
                   });
             });
@@ -285,7 +371,7 @@ class User extends Authenticatable
         return false;
     }
 
-    // The parent's children that a message can be "about"
+    // The parent's children that a message between these two people can be "about"
     public function sharedStudentsWith(User $other)
     {
         $parent = $this->hasRole('parent') ? $this : $other;
@@ -295,10 +381,10 @@ class User extends Authenticatable
             return collect();
         }
 
-        $children = $parent->children();
+        $children = $parent->children()->with('classRoom');
 
         if (! $staff->hasRole('school-admin')) {
-            $children->whereIn('students.class_id', $staff->myClasses()->pluck('id'));
+            $children->whereIn('students.id', $staff->myStudents()->select('students.id'));
         }
 
         return $children->get();

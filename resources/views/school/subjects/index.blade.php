@@ -45,6 +45,7 @@
                                         @endif
                                     </td>
                                     <td class="px-4 py-3 space-x-2">
+                                        <a href="{{ route('school.subjects.teachers.edit', $subject) }}" class="text-green-600 hover:underline">Teachers</a>
                                         <a href="{{ route('school.subjects.edit', $subject) }}" class="text-blue-600 hover:underline">Edit</a>
                                         <form action="{{ route('school.subjects.destroy', $subject) }}" method="POST" class="inline" onsubmit="return confirm('Delete this subject? It is removed from all classes and learners.')">
                                             @csrf

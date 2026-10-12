@@ -33,6 +33,25 @@
                             @error('phone') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
                         </div>
 
+                        <div class="mb-4" x-data="{ smt: {{ old('is_smt', $teacher->is_smt ?? false) ? 'true' : 'false' }} }">
+                                <input type="hidden" name="is_smt" value="0">
+                          <label class="flex items-center gap-2">
+                          <input type="checkbox" name="is_smt" value="1" x-model="smt"
+                         class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                          <span class="text-sm font-medium text-gray-700">SMT member (School Management Team)</span>
+                            </label>
+
+                        <div x-show="smt" style="display:none" class="mt-3">
+                         <label class="block text-sm font-medium text-gray-700 mb-1">Position</label>
+                     <select name="position" class="w-full rounded-md border-gray-300 shadow-sm">
+            <option value="">Select position</option>
+            @foreach(\App\Models\User::SMT_POSITIONS as $pos)
+                <option value="{{ $pos }}" {{ old('position', $teacher->position ?? '') === $pos ? 'selected' : '' }}>{{ $pos }}</option>
+            @endforeach
+        </select>
+    </div>
+</div>
+
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Password *</label>
                             <input type="password" name="password" required

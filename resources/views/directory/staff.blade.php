@@ -41,6 +41,7 @@
                                         <div class="min-w-0">
                                             <div class="truncate font-bold text-ink">{{ $u->name }}</div>
                                             <span class="badge">{{ $u->roleLabel() }}</span>
+                                            @if($u->is_smt)<span class="badge ms-1">SMT{{ $u->position ? ' · ' . $u->position : '' }}</span>@endif
                                         </div>
                                     </div>
 

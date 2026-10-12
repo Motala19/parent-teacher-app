@@ -5,9 +5,11 @@ namespace App\Http\Controllers\School;
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
 use App\Models\ClassRoom;
+use App\Models\Subject;
+use App\Models\User;
 use App\Support\Attachments;
+use App\Support\Notifier;
 use Illuminate\Http\Request;
-use Illuminate\Support\Arr;
 use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 
@@ -26,24 +28,14 @@ class AnnouncementController extends Controller
         return $announcement;
     }
 
-    private function classes()
+    private function activeClasses()
     {
-        return ClassRoom::where('school_id', $this->schoolId())->orderBy('grade')->orderBy('name')->get();
-    }
-
-    private function rules(): array
-    {
-        return [
-            'class_id' => ['nullable', Rule::in($this->classes()->pluck('id')->all())],
-            'type'     => ['required', Rule::in(array_keys(Announcement::TYPES))],
-            'title'    => 'required|string|max:255',
-            'body'     => 'required|string|max:5000',
-        ] + Attachments::announcementRules();
+        return ClassRoom::where('school_id', $this->schoolId())->where('is_active', true)->get();
     }
 
     public function index(Request $request)
     {
-        $announcements = Announcement::with(['user', 'classRoom', 'attachments'])
+        $announcements = Announcement::with(['user', 'attachments'])
             ->where('school_id', $this->schoolId())
             ->when(
                 array_key_exists((string) $request->type, Announcement::TYPES),
@@ -58,37 +50,83 @@ class AnnouncementController extends Controller
 
     public function create()
     {
+        $sid = $this->schoolId();
+
+        $gradeClasses = $this->activeClasses()
+            ->sortBy(fn ($c) => [Subject::gradeRank($c->grade), $c->name])
+            ->groupBy(fn ($c) => (string) ($c->grade ?: ''));
+
         return view('school.announcements.create', [
-            'classes' => $this->classes(),
-            'types'   => Announcement::TYPES,
+            'gradeClasses' => $gradeClasses,
+            'types'        => Announcement::TYPES,
+            'teacherCount' => User::role('teacher')->where('school_id', $sid)->count(),
+            'smtCount'     => User::smtMembers()->where('school_id', $sid)->count(),
         ]);
     }
 
     public function store(Request $request)
     {
-        $data = $request->validate($this->rules(), Attachments::announcementMessages());
+        $classes = $this->activeClasses();
 
-        $announcement = Announcement::create(Arr::only($data, ['class_id', 'type', 'title', 'body']) + [
-            'school_id'    => $this->schoolId(),
-            'user_id'      => auth()->id(),
-            'is_published' => true,
-            'published_at' => now(),
+        $data = $request->validate([
+            'audience'  => ['required', Rule::in(Announcement::AUDIENCES)],
+            'classes'   => ['required_if:audience,classes', 'nullable', 'array'],
+            'classes.*' => ['integer', Rule::in($classes->pluck('id')->all())],
+            'type'      => ['required', Rule::in(array_keys(Announcement::TYPES))],
+            'title'     => 'required|string|max:255',
+            'body'      => 'required|string|max:5000',
+        ] + Attachments::announcementRules(), Attachments::announcementMessages() + [
+            'audience.required'    => 'Choose who should receive this.',
+            'classes.required_if'  => 'Tick at least one grade or class.',
         ]);
 
-        $count = Attachments::store($announcement, $request->file('files'), auth()->user());
+        $selected = collect();
+
+        if ($data['audience'] === 'classes') {
+            $selected = $classes->whereIn('id', array_map('intval', $data['classes'] ?? []))->values();
+            abort_if($selected->isEmpty(), 422);
+        }
+
+        $label = match ($data['audience']) {
+            'school'   => 'Whole school',
+            'teachers' => 'Teachers only',
+            'smt'      => 'SMT only',
+            default    => Announcement::labelForClasses($selected, $classes),
+        };
+
+        $announcement = Announcement::create([
+            'school_id'      => $this->schoolId(),
+            'user_id'        => auth()->id(),
+            'audience'       => $data['audience'],
+            'audience_label' => $label,
+            'type'           => $data['type'],
+            'title'          => $data['title'],
+            'body'           => $data['body'],
+            'is_published'   => true,
+            'published_at'   => now(),
+        ]);
+
+        if ($selected->isNotEmpty()) {
+            $announcement->targets()->createMany(
+                $selected->map(fn ($c) => ['class_id' => $c->id, 'subject_id' => null])->all()
+            );
+        }
+
+        $count    = Attachments::store($announcement, $request->file('files'), auth()->user());
+        $notified = Notifier::announcement($announcement);
 
         return redirect()->route('school.announcements.index')
-            ->with('success', ($announcement->type === 'newsletter' ? 'Newsletter sent' : 'Announcement posted')
-                . ($count ? " with {$count} " . Str::plural('file', $count) : '') . '.');
+            ->with('success', ($announcement->type === 'newsletter' ? 'Newsletter sent' : 'Announcement posted') . " to {$label}"
+                . ($count ? " with {$count} " . Str::plural('file', $count) : '')
+                . ($notified ? ". {$notified} " . Str::plural('person', $notified) . ' notified.' : '.'));
     }
 
     public function edit(Announcement $announcement)
     {
-        $this->own($announcement)->load(['classRoom', 'attachments']);
+        $this->own($announcement)->load('attachments');
 
         return view('school.announcements.edit', [
             'announcement' => $announcement,
-            'classes'      => $this->classes(),
             'types'        => Announcement::TYPES,
         ]);
     }
@@ -97,12 +135,19 @@ class AnnouncementController extends Controller
     {
         $this->own($announcement);
 
-        $data = $request->validate($this->rules() + [
+        $data = $request->validate([
+            'type'           => ['required', Rule::in(array_keys(Announcement::TYPES))],
+            'title'          => 'required|string|max:255',
+            'body'           => 'required|string|max:5000',
             'remove_files'   => 'nullable|array',
             'remove_files.*' => 'integer',
-        ], Attachments::announcementMessages());
+        ] + Attachments::announcementRules(), Attachments::announcementMessages());
 
-        $announcement->update(Arr::only($data, ['class_id', 'type', 'title', 'body']));
+        $announcement->update([
+            'type'  => $data['type'],
+            'title' => $data['title'],
+            'body'  => $data['body'],
+        ]);
 
         Attachments::remove($announcement, $data['remove_files'] ?? []);
         Attachments::store($announcement, $request->file('files'), auth()->user());

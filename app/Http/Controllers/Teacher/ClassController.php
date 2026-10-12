@@ -34,7 +34,7 @@ class ClassController extends Controller
         $teachers = User::whereIn('id', $class->subjects->pluck('pivot.teacher_id')->filter()->all())
             ->get()->keyBy('id');
 
-        $announcements = Announcement::where('class_id', $class->id)
+        $announcements = Announcement::whereHas('targets', fn ($q) => $q->where('class_id', $class->id))
             ->latest()
             ->take(5)
             ->get();

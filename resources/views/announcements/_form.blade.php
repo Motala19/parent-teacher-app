@@ -3,6 +3,9 @@
     $wanted  = (string) request('type');
     $current = old('type', $announcement->type ?? (array_key_exists($wanted, $types) ? $wanted : 'general'));
 
+    // ?audience=subject:5:12, grade:5:12, all:12, or the older ?class=5
+    $preselect = old('audience', request('audience') ?: (request('class') ? 'class:' . request('class') : ''));
+
     $hints = [
         'newsletter'     => 'Attach your newsletter as a PDF. Parents can read it in the browser or download it.',
         'question_paper' => 'Attach the question paper (PDF or Word). Put the subject and date in the title.',
@@ -18,20 +21,114 @@
     <div class="mb-6">
         <label class="field-label">Send to</label>
 
-        @if(($lockClass ?? false) && $editing)
-            <span class="chip">{{ $announcement->classRoom?->name ?? 'Whole school' }}</span>
-        @else
-            <select name="class_id" {{ $allowSchoolWide ? '' : 'required' }}
-                    class="w-full rounded-md border-gray-300 shadow-sm">
-                <option value="">{{ $allowSchoolWide ? 'Whole school' : 'Select class' }}</option>
-                @foreach($classes as $c)
-                    <option value="{{ $c->id }}"
-                        {{ old('class_id', $announcement->class_id ?? request('class')) == $c->id ? 'selected' : '' }}>
-                        {{ $c->name }}
-                    </option>
+        @if($editing)
+            <span class="chip">{{ $announcement->audienceLabel() }}</span>
+            <p class="mt-2 text-sm text-ink-muted">Who receives it can't be changed after posting. Delete it and post again to change the audience.</p>
+
+        @elseif(isset($audiences))
+            {{-- Teacher: class, subject in one class, whole grade, all my classes --}}
+            <select name="audience" required class="w-full rounded-md border-gray-300 shadow-sm">
+                <option value="">Select who should receive this</option>
+                @foreach(collect($audiences)->groupBy('group', true) as $group => $items)
+                    <optgroup label="{{ $group }}">
+                        @foreach($items as $key => $item)
+                            <option value="{{ $key }}" {{ $preselect === $key ? 'selected' : '' }}>{{ $item['label'] }}</option>
+                        @endforeach
+                    </optgroup>
                 @endforeach
             </select>
-            @error('class_id') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+            @error('audience') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+
+        @elseif(isset($gradeClasses))
+            {{-- School admin: whole school, grades and classes, teachers only, SMT only --}}
+            <div class="space-y-3"
+                 x-data="{
+                    mode: @js(old('audience', 'school')),
+                    picked: @js(array_map('strval', (array) old('classes', []))),
+                    grades: @js($gradeClasses->map(fn ($items) => $items->pluck('id')->map(fn ($id) => (string) $id)->values())->toArray()),
+                    gradeOn(g) { const ids = this.grades[g] || []; return ids.length > 0 && ids.every(id => this.picked.includes(id)); },
+                    toggleGrade(g, on) {
+                        const ids = this.grades[g] || [];
+                        this.picked = on ? Array.from(new Set([...this.picked, ...ids])) : this.picked.filter(id => ! ids.includes(id));
+                    },
+                    all() { this.picked = Object.values(this.grades).flat(); }
+                 }">
+
+                <div class="grid gap-3 sm:grid-cols-2">
+                    <label class="aud-opt" :class="{ 'is-on': mode === 'school' }">
+                        <input type="radio" name="audience" value="school" x-model="mode" class="sr-only">
+                        <span class="aud-dot"></span>
+                        <span><span class="block font-bold text-ink">Whole school</span><span class="text-sm text-ink-muted">Every parent and every teacher</span></span>
+                    </label>
+
+                    <label class="aud-opt" :class="{ 'is-on': mode === 'classes' }">
+                        <input type="radio" name="audience" value="classes" x-model="mode" class="sr-only">
+                        <span class="aud-dot"></span>
+                        <span><span class="block font-bold text-ink">Grades and classes</span><span class="text-sm text-ink-muted">One grade, several grades, or specific classes</span></span>
+                    </label>
+
+                    <label class="aud-opt" :class="{ 'is-on': mode === 'teachers' }">
+                        <input type="radio" name="audience" value="teachers" x-model="mode" class="sr-only">
+                        <span class="aud-dot"></span>
+                        <span><span class="block font-bold text-ink">Teachers only</span><span class="text-sm text-ink-muted">{{ $teacherCount }} {{ \Illuminate\Support\Str::plural('teacher', $teacherCount) }}. Parents will not see it.</span></span>
+                    </label>
+
+                    <label class="aud-opt" :class="{ 'is-on': mode === 'smt' }">
+                        <input type="radio" name="audience" value="smt" x-model="mode" class="sr-only">
+                        <span class="aud-dot"></span>
+                        <span><span class="block font-bold text-ink">SMT members only</span><span class="text-sm text-ink-muted">{{ $smtCount }} {{ \Illuminate\Support\Str::plural('member', $smtCount) }} of the School Management Team</span></span>
+                    </label>
+                </div>
+
+                <p x-show="mode === 'smt'" style="display:none"
+                   class="rounded-xl bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
+                    @if($smtCount === 0)
+                        No one is marked as SMT yet, so nobody would receive this. Open
+                        <a href="{{ route('school.teachers.index') }}" class="font-bold underline">Teachers</a>, edit a teacher and tick <strong>SMT member</strong>.
+                    @else
+                        Only teachers marked as SMT members see this announcement.
+                    @endif
+                </p>
+
+                <div x-show="mode === 'classes'" style="display:none" class="space-y-3">
+                    <div class="flex flex-wrap items-center justify-between gap-2">
+                        <span class="text-sm text-ink-muted"><strong class="text-ink" x-text="picked.length"></strong> class(es) selected. Tick a grade to select all its classes.</span>
+                        <span class="flex gap-3 text-sm font-semibold">
+                            <button type="button" class="text-navy-500 hover:text-brand-red" x-on:click="all()">Select everything</button>
+                            <button type="button" class="text-navy-500 hover:text-brand-red" x-on:click="picked = []">Clear</button>
+                        </span>
+                    </div>
+
+                    @forelse($gradeClasses as $grade => $items)
+                        @php($grade = (string) $grade)
+                        <div class="grade-box">
+                            <label class="grade-box-head cursor-pointer">
+                                <input type="checkbox" class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500"
+                                       :checked="gradeOn('{{ $grade }}')"
+                                       x-on:change="toggleGrade('{{ $grade }}', $event.target.checked)">
+                                <span>{{ $grade === '' ? 'No grade set' : ($grade === 'R' ? 'Grade R' : 'Grade ' . $grade) }}</span>
+                                <span class="text-xs font-medium text-ink-muted">{{ $items->count() }} {{ \Illuminate\Support\Str::plural('class', $items->count()) }}</span>
+                            </label>
+
+                            <div class="flex flex-wrap gap-2 p-3">
+                                @foreach($items as $c)
+                                    <label class="class-check">
+                                        <input type="checkbox" name="classes[]" value="{{ $c->id }}" x-model="picked" :disabled="mode !== 'classes'"
+                                               class="rounded border-gray-300 text-blue-600 shadow-sm focus:ring-blue-500">
+                                        {{ $c->name }}
+                                    </label>
+                                @endforeach
+                            </div>
+                        </div>
+                    @empty
+                        <p class="text-sm text-ink-muted">No active classes yet. Create classes first.</p>
+                    @endforelse
+                </div>
+            </div>
+
+            @error('audience') <p class="text-red-600 text-sm mt-2">{{ $message }}</p> @enderror
+            @error('classes') <p class="text-red-600 text-sm mt-2">{{ $message }}</p> @enderror
+            @error('classes.*') <p class="text-red-600 text-sm mt-2">{{ $message }}</p> @enderror
         @endif
     </div>
 

@@ -63,8 +63,18 @@
                                             <span class="text-gray-400">None linked</span>
                                         @endforelse
                                     </td>
+
+
                                     <td class="px-4 py-3 space-x-2">
                                         <a href="{{ route('school.parents.edit', $parent) }}" class="text-blue-600 hover:underline">Edit</a>
+
+                                        @if($parent->realEmail())
+    <form action="{{ route('school.parents.invite', $parent) }}" method="POST" class="inline"
+          onsubmit="return confirm('Email this parent a link to set their password?')">
+        @csrf
+        <button type="submit" class="text-green-600 hover:underline">{{ $parent->invited_at ? 'Re-invite' : 'Invite' }}</button>
+    </form>
+@endif
                                         <form action="{{ route('school.parents.destroy', $parent) }}" method="POST" class="inline" onsubmit="return confirm('Delete this parent account?')">
                                             @csrf
                                             @method('DELETE')

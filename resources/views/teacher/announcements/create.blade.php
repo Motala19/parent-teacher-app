@@ -1,15 +1,15 @@
 <x-app-layout>
     <x-slot name="header">
         <h2>Post Announcement</h2>
-        <p>Share homework, assignments, question papers and reminders with a class.</p>
+        <p>Share homework, assignments and question papers with a class, or only with the learners taking your subject.</p>
     </x-slot>
 
     <div class="py-12">
         <div class="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="card">
                 <div class="p-6 sm:p-8">
-                    @if($classes->isEmpty())
-                        <x-empty title="No classes yet" text="You aren't linked to a class. Please ask your school admin." icon="layers" />
+                    @if($audiences->isEmpty())
+                        <x-empty title="Nothing assigned yet" text="You aren't linked to a class or a subject yet. Please ask your school admin." icon="layers" />
                     @else
                         <form action="{{ route('teacher.announcements.store') }}" method="POST" enctype="multipart/form-data"
                               x-data="{ sending: false }" x-on:submit="sending = true">

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Teacher;
 
 use App\Http\Controllers\Controller;
 use App\Models\Announcement;
+use App\Support\TeacherSubjects;
 
 class DashboardController extends Controller
 {
@@ -16,18 +17,17 @@ class DashboardController extends Controller
             ->orderBy('grade')->orderBy('name')
             ->get();
 
+        $subjects = TeacherSubjects::summary($user);
+
+        $learners = $user->myStudents()->where('students.is_active', true)->count();
+
         $notices = Announcement::with(['user', 'attachments'])
-            ->where('school_id', $user->school_id)
-            ->whereNull('class_id')
-            ->where('is_published', true)
-            ->latest('published_at')
+            ->forStaff($user)
+            ->where('announcements.user_id', '!=', $user->id)
+            ->latest('announcements.published_at')
             ->take(5)
             ->get();
 
-        return view('dashboards.teacher', [
-            'classes'  => $classes,
-            'learners' => $classes->sum('students_count'),
-            'notices'  => $notices,
-        ]);
+        return view('dashboards.teacher', compact('classes', 'subjects', 'learners', 'notices'));
     }
 }

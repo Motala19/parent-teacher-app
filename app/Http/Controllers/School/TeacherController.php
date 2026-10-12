@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\School;
 
 use App\Http\Controllers\Controller;
+use App\Models\ClassRoom;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -28,13 +29,17 @@ class TeacherController extends Controller
 
     public function index()
     {
+        $schoolId = $this->schoolId();
+
         $teachers = User::role('teacher')
             ->with(['classes', 'teachingSubjects'])
-            ->where('school_id', $this->schoolId())
+            ->where('school_id', $schoolId)
             ->orderBy('name')
             ->paginate(15);
 
-        return view('school.teachers.index', compact('teachers'));
+        $classNames = ClassRoom::where('school_id', $schoolId)->pluck('name', 'id');
+
+        return view('school.teachers.index', compact('teachers', 'classNames'));
     }
 
     public function create()
@@ -49,8 +54,12 @@ class TeacherController extends Controller
             'email'    => 'required|email|unique:users,email',
             'phone'    => 'nullable|string|max:30',
             'password' => 'required|string|min:8|confirmed',
+            'is_smt'   => 'nullable|boolean',
+            'position' => ['nullable', Rule::in(User::SMT_POSITIONS)],
         ]);
 
+        $data['is_smt']    = $request->boolean('is_smt');
+        $data['position']  = $data['is_smt'] ? ($data['position'] ?? null) : null;
         $data['password']  = Hash::make($data['password']);
         $data['school_id'] = $this->schoolId();
 
@@ -76,7 +85,12 @@ class TeacherController extends Controller
             'email'    => ['required', 'email', Rule::unique('users', 'email')->ignore($teacher->id)],
             'phone'    => 'nullable|string|max:30',
             'password' => 'nullable|string|min:8|confirmed',
+            'is_smt'   => 'nullable|boolean',
+            'position' => ['nullable', Rule::in(User::SMT_POSITIONS)],
         ]);
+
+        $data['is_smt']   = $request->boolean('is_smt');
+        $data['position'] = $data['is_smt'] ? ($data['position'] ?? null) : null;
 
         if (! empty($data['password'])) {
             $data['password'] = Hash::make($data['password']);

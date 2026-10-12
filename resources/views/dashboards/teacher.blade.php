@@ -8,7 +8,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2>{{ $greeting }}, {{ $first }}</h2>
-        <p>Here's what's happening in your classes.</p>
+        <p>Here's what's happening with your classes and subjects.</p>
     </x-slot>
 
     <div class="py-12">
@@ -27,7 +27,7 @@
                 </a>
                 <a href="{{ route('teacher.announcements.create', ['type' => 'assignment']) }}" wire:navigate class="tile">
                     <span class="tile-icon"><x-icon name="paperclip" /></span>
-                    <div><div class="tile-title">Post assignment</div><div class="tile-sub">Share the sheet with the class</div></div>
+                    <div><div class="tile-title">Post assignment</div><div class="tile-sub">Share the sheet with learners</div></div>
                     <x-icon name="arrow" :size="18" class="arrow" />
                 </a>
                 <a href="{{ route('messages.index') }}" wire:navigate class="tile">
@@ -40,31 +40,66 @@
                 </a>
             </div>
 
-            <div class="grid grid-cols-2 lg:grid-cols-3 gap-4 stagger">
-                <x-stat-card label="My classes" :value="$classes->count()" icon="layers" />
-                <x-stat-card label="Learners" :value="$learners" icon="users" />
-                <x-stat-card label="Unread messages" :value="$unread" icon="chat" tone="rose" class="col-span-2 lg:col-span-1" />
+            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
+                <x-stat-card label="Class teacher of" :value="$classes->count()" icon="layers" />
+                <x-stat-card label="Subjects" :value="$subjects->count()" icon="book" />
+                <x-stat-card label="Learners I teach" :value="$learners" icon="users" />
+                <x-stat-card label="Unread messages" :value="$unread" icon="chat" tone="rose" />
             </div>
 
             <div class="grid lg:grid-cols-2 gap-6">
-                <div class="card overflow-hidden">
-                    <div class="panel-head"><h3>My classes</h3></div>
-                    @forelse($classes as $class)
-                        <div class="list-row">
-                            <span class="stat-icon"><x-icon name="layers" :size="20" /></span>
-                            <div class="min-w-0 flex-1">
-                                <a href="{{ route('teacher.classes.show', $class) }}" wire:navigate class="font-semibold text-ink hover:text-brand-red transition">{{ $class->name }}</a>
-                                <div class="text-xs text-ink-muted">{{ $class->students_count }} learners</div>
+                <div class="space-y-6">
+
+                    @if($subjects->isNotEmpty())
+                        <div class="card overflow-hidden">
+                            <div class="panel-head">
+                                <h3>My subjects</h3>
+                                <a href="{{ route('teacher.subjects.index') }}" wire:navigate class="text-sm font-semibold text-navy-500 hover:text-brand-red transition">View all</a>
                             </div>
-                            <a href="{{ route('teacher.announcements.create', ['class' => $class->id]) }}" wire:navigate class="btn btn-primary btn-sm">Announce</a>
+                            @foreach($subjects as $row)
+                                <div class="list-row flex-wrap">
+                                    <span class="stat-icon"><x-icon name="book" :size="20" /></span>
+                                    <div class="min-w-0 flex-1">
+                                        <a href="{{ route('teacher.subjects.show', ['subject' => $row->subject->id]) }}" wire:navigate
+                                           class="font-semibold text-ink hover:text-brand-red transition">{{ $row->subject->name }}</a>
+                                        <div class="text-xs text-ink-muted">
+                                            {{ $row->classes->map(fn ($c) => $c->class->name . ' (' . $c->learners . ')')->join(', ') }}
+                                        </div>
+                                    </div>
+                                    <a href="{{ route('teacher.subjects.show', ['subject' => $row->subject->id]) }}" wire:navigate class="btn btn-navy btn-sm">Learners</a>
+                                </div>
+                            @endforeach
                         </div>
-                    @empty
-                        <x-empty title="No classes yet" text="Ask your school admin to link you to a class." icon="layers" />
-                    @endforelse
+                    @endif
+
+                    @if($classes->isNotEmpty())
+                        <div class="card overflow-hidden">
+                            <div class="panel-head"><h3>My classes</h3></div>
+                            @foreach($classes as $class)
+                                <div class="list-row">
+                                    <span class="stat-icon"><x-icon name="layers" :size="20" /></span>
+                                    <div class="min-w-0 flex-1">
+                                        <a href="{{ route('teacher.classes.show', $class) }}" wire:navigate class="font-semibold text-ink hover:text-brand-red transition">{{ $class->name }}</a>
+                                        <div class="text-xs text-ink-muted">{{ $class->students_count }} learners</div>
+                                    </div>
+                                    <a href="{{ route('teacher.announcements.create', ['class' => $class->id]) }}" wire:navigate class="btn btn-primary btn-sm">Announce</a>
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+
+                    @if($subjects->isEmpty() && $classes->isEmpty())
+                        <div class="card">
+                            <x-empty title="Nothing assigned yet" text="Your school admin will link you to a class or a subject." icon="layers" />
+                        </div>
+                    @endif
                 </div>
 
-                <div class="card overflow-hidden">
-                    <div class="panel-head"><h3>School notices &amp; newsletters</h3></div>
+                <div class="card overflow-hidden self-start">
+                    <div class="panel-head">
+                        <h3>Notices for you</h3>
+                        <a href="{{ route('teacher.notices.index') }}" wire:navigate class="text-sm font-semibold text-navy-500 hover:text-brand-red transition">View all</a>
+                    </div>
                     @forelse($notices as $a)
                         <div class="list-row note tone-{{ $a->type }} items-start">
                             <div class="min-w-0 flex-1">

@@ -15,6 +15,21 @@ class Subject extends Model
 
     protected $casts = ['is_active' => 'boolean'];
 
+       protected static function booted(): void
+    {
+        static::deleting(function (Subject $subject) {
+            Announcement::whereHas('targets', fn ($q) => $q->where('subject_id', $subject->id))->get()->each->delete();
+        });
+    }
+
+    // For sorting: R, 1, 2 ... 12. Anything unknown goes last.
+    public static function gradeRank(?string $grade): int
+    {
+        $index = array_search((string) $grade, self::GRADES, true);
+
+        return $index === false ? 99 : $index;
+    }
+
     public function school(): BelongsTo
     {
         return $this->belongsTo(School::class);

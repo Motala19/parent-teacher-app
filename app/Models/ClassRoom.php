@@ -37,9 +37,9 @@ class ClassRoom extends Model
                     ->withTimestamps();
     }
 
-    public function announcements(): HasMany
+        public function announcements(): BelongsToMany
     {
-        return $this->hasMany(Announcement::class, 'class_id');
+        return $this->belongsToMany(Announcement::class, 'announcement_targets', 'class_id', 'announcement_id');
     }
 
     public function messages(): HasMany

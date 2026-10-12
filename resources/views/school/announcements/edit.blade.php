@@ -12,7 +12,7 @@
                           x-data="{ sending: false }" x-on:submit="sending = true">
                         @csrf
                         @method('PUT')
-                        @include('announcements._form', ['allowSchoolWide' => true, 'lockClass' => false])
+                        @include('announcements._form')
 
                         <div class="flex gap-3 mt-8">
                             <button type="submit" class="btn btn-primary" :disabled="sending" :class="{ 'opacity-60 cursor-wait': sending }">

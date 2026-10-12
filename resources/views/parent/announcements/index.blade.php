@@ -24,7 +24,7 @@
                 <article class="card note card-hover tone-{{ $a->type }} p-6">
                     <div class="flex flex-wrap items-center gap-2 mb-3">
                         <span class="badge">{{ $a->typeLabel() }}</span>
-                        <span class="chip">{{ $a->classRoom->name ?? 'Whole school' }}</span>
+                        <span class="chip">{{ $a->audienceLabel() }}</span>
                     </div>
 
                     <h3 class="text-lg font-bold text-ink">{{ $a->title }}</h3>

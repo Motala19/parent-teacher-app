@@ -27,7 +27,7 @@
                     </div>
                 @empty
                     <div class="card sm:col-span-2 lg:col-span-3">
-                        <x-empty title="No classes yet" text="You haven't been linked to a class. Please ask your school admin." icon="layers" />
+                        <x-empty title="You aren't a class teacher" text="Open My Subjects to see the learners you teach." icon="layers" />
                     </div>
                 @endforelse
             </div>

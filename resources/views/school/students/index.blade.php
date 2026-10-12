@@ -34,7 +34,7 @@
                         <a href="{{ route('school.students.index') }}" class="text-sm text-gray-600 hover:underline">Clear</a>
                     @endif
                 </form>
-
+                <a href="{{ route('school.import.index') }}" class="btn btn-ghost btn-sm"><x-icon name="upload" :size="14" /> Import from Excel</a>
                 <a href="{{ route('school.students.create') }}"
                    class="inline-flex items-center px-4 py-2 bg-blue-600 border border-transparent rounded-md font-semibold text-xs text-white uppercase tracking-widest hover:bg-blue-700">
                     + Add Learner

@@ -2,10 +2,13 @@
 
 namespace App\Http\Controllers;
 
+
 use App\Models\ConversationClosure;
 use App\Models\Message;
 use App\Models\User;
+use App\Notifications\NewMessage;
 use App\Support\Attachments;
+use App\Support\Notifier;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\Validation\Rule;
@@ -79,7 +82,7 @@ class MessageController extends Controller
         })->filter()->sortByDesc(fn ($c) => $c->last->id)->values();
     }
 
-    private function contactsFor(User $me, string $tab)
+        private function contactsFor(User $me, string $tab)
     {
         if ($me->hasRole('parent')) {
             return $me->messageableSchoolStaff()->with('roles')->orderBy('name')->get();
@@ -95,10 +98,10 @@ class MessageController extends Controller
             return $query->with('children.classRoom')->get();
         }
 
-        $classIds = $me->myClasses()->pluck('id');
-
         return $query->with([
-            'children' => fn ($q) => $q->whereIn('students.class_id', $classIds)->with('classRoom'),
+            'children' => fn ($q) => $q
+                ->whereIn('students.id', $me->myStudents()->select('students.id'))
+                ->with('classRoom'),
         ])->get();
     }
 
@@ -152,6 +155,11 @@ class MessageController extends Controller
             ->update(['is_read' => true, 'read_at' => now()]);
 
         $messages->where('sender_id', $contact->id)->each(fn ($m) => $m->is_read = true);
+                $me->unreadNotifications()
+            ->where('type', NewMessage::class)
+            ->get()
+            ->filter(fn ($n) => (int) ($n->data['sender_id'] ?? 0) === (int) $contact->id)
+            ->each->markAsRead();
 
         return $messages;
     }
@@ -239,6 +247,7 @@ class MessageController extends Controller
         ]);
 
         Attachments::store($message, $request->file('files'), $me);
+        Notifier::message($message->load(['sender', 'receiver', 'student']));
 
         // Writing in a closed chat reopens it
         ConversationClosure::where('user_id', $me->id)->where('contact_id', $contact->id)->delete();

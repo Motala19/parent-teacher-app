@@ -59,6 +59,11 @@
                         <div><div class="tile-title">Add a parent</div><div class="tile-sub">Link to one or more learners</div></div>
                         <x-icon name="arrow" :size="18" class="arrow" />
                     </a>
+                    <a href="{{ route('school.import.index') }}" wire:navigate class="tile tile-rose">
+    <span class="tile-icon"><x-icon name="upload" /></span>
+    <div><div class="tile-title">Import learners &amp; parents</div><div class="tile-sub">From Excel or CSV, parents linked automatically</div></div>
+    <x-icon name="arrow" :size="18" class="arrow" />
+</a>
                     <a href="{{ route('school.classes.create') }}" wire:navigate class="tile">
                         <span class="tile-icon"><x-icon name="layers" /></span>
                         <div><div class="tile-title">Create a class</div><div class="tile-sub">Set the grade and class teacher</div></div>

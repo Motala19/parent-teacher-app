@@ -16,6 +16,10 @@ new class extends Component
     $me = auth()->user();
     $unread = $me->hasAnyRole(['teacher', 'parent', 'school-admin']) ? $me->unreadMessageCount() : 0;
     $dashRoutes = ['dashboard', 'admin.dashboard', 'school.dashboard', 'teacher.dashboard', 'parent.dashboard'];
+
+    $isTeacher    = $me->hasRole('teacher');
+    $showClasses  = $isTeacher && $me->isClassTeacher();
+    $showSubjects = $isTeacher && ($me->subjectAssignments()->exists() || ! $showClasses);
 @endphp
 
 <nav x-data="{ open: false }" class="nav-shell">
@@ -51,11 +55,17 @@ new class extends Component
                         <x-nav-link :href="route('school.my-school.edit')" :active="request()->routeIs('school.my-school.*')" wire:navigate>{{ __('My School') }}</x-nav-link>
                     @endrole
 
-                    @role('teacher')
-                        <x-nav-link :href="route('teacher.classes.index')" :active="request()->routeIs('teacher.classes.*')" wire:navigate>{{ __('My Classes') }}</x-nav-link>
+                        @role('teacher')
+                        @if($showClasses)
+                            <x-nav-link :href="route('teacher.classes.index')" :active="request()->routeIs('teacher.classes.*')" wire:navigate>{{ __('My Classes') }}</x-nav-link>
+                        @endif
+                        @if($showSubjects)
+                            <x-nav-link :href="route('teacher.subjects.index')" :active="request()->routeIs('teacher.subjects.*')" wire:navigate>{{ __('My Subjects') }}</x-nav-link>
+                        @endif
                         <x-nav-link :href="route('directory.learners')" :active="request()->routeIs('directory.learners')" wire:navigate>{{ __('Learners') }}</x-nav-link>
                         <x-nav-link :href="route('directory.staff')" :active="request()->routeIs('directory.staff')" wire:navigate>{{ __('Staff') }}</x-nav-link>
                         <x-nav-link :href="route('teacher.announcements.index')" :active="request()->routeIs('teacher.announcements.*')" wire:navigate>{{ __('Announcements') }}</x-nav-link>
+                        <x-nav-link :href="route('teacher.notices.index')" :active="request()->routeIs('teacher.notices.*')" wire:navigate>{{ __('Notices') }}</x-nav-link>
                     @endrole
 
                     @role('parent')
@@ -73,36 +83,44 @@ new class extends Component
                 </div>
             </div>
 
-            <div class="hidden xl:flex xl:items-center">
-                <x-dropdown align="right" width="48">
-                    <x-slot name="trigger">
-                        <button class="inline-flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition focus:outline-none">
-                            <x-avatar :name="$me->name" size="h-8 w-8 text-xs" />
-                            <span class="hidden 2xl:inline">{{ $me->name }}</span>
-                            <x-icon name="chevron" :size="16" />
-                        </button>
-                    </x-slot>
+            <div class="flex items-center gap-2">
+                <x-notification-bell />
 
-                    <x-slot name="content">
-                        <div class="px-4 py-3 border-b border-gray-100">
-                            <div class="text-sm font-bold text-ink">{{ $me->name }}</div>
-                            <div class="text-xs text-ink-muted">{{ $me->email }}</div>
-                            <div class="mt-1 text-xs font-semibold text-navy-600">{{ $me->roleLabel() }}</div>
-                        </div>
-                        <button wire:click="logout" class="w-full text-start">
-                            <x-dropdown-link>{{ __('Log Out') }}</x-dropdown-link>
-                        </button>
-                    </x-slot>
-                </x-dropdown>
-            </div>
+                <div class="hidden xl:flex xl:items-center">
+                    <x-dropdown align="right" width="48">
+                        <x-slot name="trigger">
+                            <button class="inline-flex items-center gap-2 pl-1.5 pr-3 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-sm font-semibold transition focus:outline-none">
+                                <x-avatar :name="$me->name" size="h-8 w-8 text-xs" />
+                                <span class="hidden 2xl:inline">{{ $me->name }}</span>
+                                <x-icon name="chevron" :size="16" />
+                            </button>
+                        </x-slot>
 
-            <div class="-me-2 flex items-center xl:hidden">
-                <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 focus:outline-none transition">
-                    <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
-                        <path x-show="! open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                        <path x-show="open" style="display:none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                </button>
+                        <x-slot name="content">
+                            <div class="px-4 py-3 border-b border-gray-100">
+                                <div class="text-sm font-bold text-ink">{{ $me->name }}</div>
+                                <div class="text-xs text-ink-muted">{{ $me->realEmail() ?? $me->phone }}</div>
+                                <div class="mt-1 text-xs font-semibold text-navy-600">{{ $me->roleLabel() }}</div>
+                            </div>
+                            @role('school-admin')
+    <x-dropdown-link :href="route('school.import.index')" wire:navigate>{{ __('Import learners') }}</x-dropdown-link>
+@endrole
+                            <x-dropdown-link :href="route('notifications.settings')" wire:navigate>{{ __('Notification settings') }}</x-dropdown-link>
+                            <button wire:click="logout" class="w-full text-start">
+                                <x-dropdown-link>{{ __('Log Out') }}</x-dropdown-link>
+                            </button>
+                        </x-slot>
+                    </x-dropdown>
+                </div>
+
+                <div class="-me-2 flex items-center xl:hidden">
+                    <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 focus:outline-none transition">
+                        <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
+                            <path x-show="! open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
+                            <path x-show="open" style="display:none" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                    </button>
+                </div>
             </div>
         </div>
     </div>
@@ -130,13 +148,20 @@ new class extends Component
                 <x-responsive-nav-link :href="route('school.announcements.index')" :active="request()->routeIs('school.announcements.*')" wire:navigate>{{ __('Announcements') }}</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('directory.staff')" :active="request()->routeIs('directory.staff')" wire:navigate>{{ __('Staff') }}</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('school.my-school.edit')" :active="request()->routeIs('school.my-school.*')" wire:navigate>{{ __('My School') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('school.import.index')" :active="request()->routeIs('school.import.*')" wire:navigate>{{ __('Import learners') }}</x-responsive-nav-link>
             @endrole
 
-            @role('teacher')
-                <x-responsive-nav-link :href="route('teacher.classes.index')" :active="request()->routeIs('teacher.classes.*')" wire:navigate>{{ __('My Classes') }}</x-responsive-nav-link>
+                @role('teacher')
+                @if($showClasses)
+                    <x-responsive-nav-link :href="route('teacher.classes.index')" :active="request()->routeIs('teacher.classes.*')" wire:navigate>{{ __('My Classes') }}</x-responsive-nav-link>
+                @endif
+                @if($showSubjects)
+                    <x-responsive-nav-link :href="route('teacher.subjects.index')" :active="request()->routeIs('teacher.subjects.*')" wire:navigate>{{ __('My Subjects') }}</x-responsive-nav-link>
+                @endif
                 <x-responsive-nav-link :href="route('directory.learners')" :active="request()->routeIs('directory.learners')" wire:navigate>{{ __('Learners') }}</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('directory.staff')" :active="request()->routeIs('directory.staff')" wire:navigate>{{ __('Staff') }}</x-responsive-nav-link>
                 <x-responsive-nav-link :href="route('teacher.announcements.index')" :active="request()->routeIs('teacher.announcements.*')" wire:navigate>{{ __('Announcements') }}</x-responsive-nav-link>
+                <x-responsive-nav-link :href="route('teacher.notices.index')" :active="request()->routeIs('teacher.notices.*')" wire:navigate>{{ __('Notices') }}</x-responsive-nav-link>
             @endrole
 
             @role('parent')
@@ -153,6 +178,8 @@ new class extends Component
                     </span>
                 </x-responsive-nav-link>
             @endhasanyrole
+
+            <x-responsive-nav-link :href="route('notifications.settings')" :active="request()->routeIs('notifications.settings')" wire:navigate>{{ __('Notification settings') }}</x-responsive-nav-link>
         </div>
 
         <div class="px-4 py-4 border-t border-white/10">
@@ -160,7 +187,7 @@ new class extends Component
                 <x-avatar :name="$me->name" />
                 <div>
                     <div class="font-semibold text-white">{{ $me->name }}</div>
-                    <div class="text-sm text-white/60">{{ $me->email }}</div>
+                    <div class="text-sm text-white/60">{{ $me->realEmail() ?? $me->phone }}</div>
                 </div>
             </div>
 

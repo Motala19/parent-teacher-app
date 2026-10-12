@@ -8,7 +8,8 @@ use Illuminate\Http\Request;
 
 class DirectoryController extends Controller
 {
-    // Learners with their parents' contact details
+    // Learners with their parents' contact details.
+    // Class teachers see the whole class. Subject teachers see the learners taking their subject.
     public function learners(Request $request)
     {
         $me      = auth()->user();
@@ -16,18 +17,21 @@ class DirectoryController extends Controller
 
         $classes = $isAdmin
             ? ClassRoom::where('school_id', $me->school_id)->orderBy('grade')->orderBy('name')->get()
-            : $me->myClasses()->orderBy('grade')->orderBy('name')->get();
+            : $me->involvedClasses()->orderBy('grade')->orderBy('name')->get();
 
-        $students = Student::with(['classRoom', 'parents'])
-            ->where('school_id', $me->school_id)
-            ->where('is_active', true)
-            ->when(! $isAdmin, fn ($q) => $q->whereIn('class_id', $classes->pluck('id')))
-            ->when($request->class_id, fn ($q, $id) => $q->where('class_id', $id))
+        $base = $isAdmin
+            ? Student::where('students.school_id', $me->school_id)
+            : $me->myStudents();
+
+        $students = $base
+            ->with(['classRoom', 'parents'])
+            ->where('students.is_active', true)
+            ->when($request->class_id, fn ($q, $id) => $q->where('students.class_id', $id))
             ->when($request->search, function ($q, $s) {
                 $q->where(function ($q) use ($s) {
-                    $q->where('first_name', 'like', "%{$s}%")
-                      ->orWhere('last_name', 'like', "%{$s}%")
-                      ->orWhere('admission_number', 'like', "%{$s}%")
+                    $q->where('students.first_name', 'like', "%{$s}%")
+                      ->orWhere('students.last_name', 'like', "%{$s}%")
+                      ->orWhere('students.admission_number', 'like', "%{$s}%")
                       ->orWhereHas('parents', function ($p) use ($s) {
                           $p->where('name', 'like', "%{$s}%")
                             ->orWhere('phone', 'like', "%{$s}%")
@@ -35,7 +39,7 @@ class DirectoryController extends Controller
                       });
                 });
             })
-            ->orderBy('class_id')->orderBy('last_name')->orderBy('first_name')
+            ->orderBy('students.class_id')->orderBy('students.last_name')->orderBy('students.first_name')
             ->paginate(20)
             ->withQueryString();
 

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\School;
 
+use App\Jobs\SendParentInvitations;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\User;
@@ -145,5 +146,15 @@ class ParentController extends Controller
 
         return redirect()->route('school.parents.index')
             ->with('success', 'Parent deleted successfully.');
+    }
+
+        public function invite(User $parent)
+    {
+        $this->own($parent);
+        abort_unless($parent->realEmail(), 404);
+
+        SendParentInvitations::dispatch([$parent->id], true);
+
+        return back()->with('success', 'An invitation email is on its way to ' . $parent->name . '.');
     }
 }
