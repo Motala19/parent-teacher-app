@@ -34,12 +34,12 @@ class NewAnnouncement extends Notification implements ShouldQueue
         return route('parent.announcements.index', [], $absolute);
     }
 
-    private function icon(): string
+       private function icon(): string
     {
         return match ($this->announcement->type) {
-            'newsletter', 'question_paper', 'assignment' => 'file',
-            'urgent'                                     => 'bell',
-            default                                      => 'megaphone',
+            'newsletter', 'question_paper', 'assignment', 'timetable', 'stationery', 'year_plan' => 'file',
+            'urgent'                                                                              => 'bell',
+            default                                                                               => 'megaphone',
         };
     }
 
@@ -54,7 +54,7 @@ class NewAnnouncement extends Notification implements ShouldQueue
             'type'            => $a->type,
             'count'           => 1,
             'title'           => $a->typeLabel() . ': ' . $a->title,
-            'body'            => Str::limit($a->body, 90),
+            'body'            => Str::limit(($a->dueLabel() ? $a->dueLabel() . ' · ' : '') . $a->body, 90),
             'where'           => $a->audienceLabel(),
             'url'             => $this->url($notifiable, false),
         ];
@@ -83,7 +83,9 @@ class NewAnnouncement extends Notification implements ShouldQueue
             ->line($poster . ' posted to ' . $where . ':')
             ->line('**' . $a->title . '**')
             ->line(Str::limit($a->body, 300));
-
+                    if ($a->dueLabel()) {
+            $mail->line('**' . $a->dueLabel() . '**');
+        }
         if ($files > 0) {
             $mail->line($files . ' ' . Str::plural('file', $files) . ' attached. Log in to view or download ' . ($files === 1 ? 'it' : 'them') . '.');
         }

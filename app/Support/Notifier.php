@@ -71,7 +71,7 @@ class Notifier
         return $recipients->count();
     }
 
-    public static function recipients(Announcement $a): Collection
+       public static function recipients(Announcement $a): Collection
     {
         $schoolId = $a->school_id;
         $a->loadMissing('targets');
@@ -86,11 +86,25 @@ class Notifier
                 break;
 
             case 'classes':
-                // Every learner the post is aimed at (a subject target = only learners taking it)
+                // Every learner the post is aimed at
                 $studentIds = collect();
 
                 foreach ($a->targets as $t) {
-                    $q = DB::table('students')->where('class_id', $t->class_id);
+                    $q = DB::table('students')->where('school_id', $schoolId);
+
+                    if ($t->class_id) {
+                        $q->where('class_id', $t->class_id);
+                    } elseif ($t->grade) {
+                        $grade = (string) $t->grade;
+
+                        // The whole grade: by the learner's grade, or by the grade of their class
+                        $q->where(function ($w) use ($grade, $schoolId) {
+                            $w->where('grade', $grade)
+                              ->orWhereIn('class_id', DB::table('classes')->where('school_id', $schoolId)->where('grade', $grade)->select('id'));
+                        });
+                    } else {
+                        continue;
+                    }
 
                     if ($t->subject_id) {
                         $q->whereIn('id', DB::table('student_subject')->where('subject_id', $t->subject_id)->select('student_id'));
@@ -108,7 +122,7 @@ class Notifier
                 if ($a->user && $a->user->hasRole('school-admin')) {
                     $teacherIds = collect();
 
-                    foreach ($a->targets as $t) {
+                    foreach ($a->targets->whereNotNull('class_id') as $t) {
                         $teacherIds = $teacherIds->merge(DB::table('class_user')->where('class_id', $t->class_id)->pluck('user_id'));
 
                         $cs = DB::table('class_subject')->where('class_id', $t->class_id)->whereNotNull('teacher_id');

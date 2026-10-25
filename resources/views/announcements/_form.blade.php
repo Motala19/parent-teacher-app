@@ -6,17 +6,29 @@
     // ?audience=subject:5:12, grade:5:12, all:12, or the older ?class=5
     $preselect = old('audience', request('audience') ?: (request('class') ? 'class:' . request('class') : ''));
 
+    $dueValue = old('due_date', $editing ? $announcement->due_date?->toDateString() : '');
+    $minDue   = ($editing && $announcement->due_date && $announcement->due_date->isPast()) ? '' : now()->toDateString();
+
     $hints = [
         'newsletter'     => 'Attach your newsletter as a PDF. Parents can read it in the browser or download it.',
+        'timetable'      => 'Attach the test, exam or class timetable (PDF or image). Choose the grades or classes it is for.',
+        'stationery'     => 'Attach the stationery list. Choose the grade(s) so only those parents receive it.',
+        'year_plan'      => 'Attach the year plan or term calendar as a PDF.',
         'question_paper' => 'Attach the question paper (PDF or Word). Put the subject and date in the title.',
-        'assignment'     => 'Attach the assignment sheet and write the instructions in the message.',
-        'homework'       => 'Attach a worksheet if there is one. Otherwise just describe the homework.',
-        'project'        => 'Attach the project brief or rubric if you have one.',
-        'test'           => 'Attach the test information or a study guide if you have one.',
+        'assignment'     => 'Attach the assignment sheet and write the instructions in the message. Set the due date below.',
+        'homework'       => 'Attach a worksheet if there is one. Add a due date so it shows in the parents\' Due soon list.',
+        'project'        => 'Attach the project brief or rubric if you have one. Set the due date below.',
+        'test'           => 'Add the test date so parents can plan. Attach a study guide if you have one.',
     ];
 @endphp
 
-<div x-data="{ type: @js($current), hints: @js($hints) }">
+<div x-data="{
+        type: @js($current),
+        hints: @js($hints),
+        dueTypes: @js(\App\Models\Announcement::DUE_TYPES),
+        dueRequired: @js(\App\Models\Announcement::DUE_REQUIRED),
+        docTypes: @js(\App\Models\Announcement::ADMIN_DOCUMENTS)
+     }">
 
     <div class="mb-6">
         <label class="field-label">Send to</label>
@@ -26,17 +38,21 @@
             <p class="mt-2 text-sm text-ink-muted">Who receives it can't be changed after posting. Delete it and post again to change the audience.</p>
 
         @elseif(isset($audiences))
-            {{-- Teacher: class, subject in one class, whole grade, all my classes --}}
-            <select name="audience" required class="w-full rounded-md border-gray-300 shadow-sm">
-                <option value="">Select who should receive this</option>
-                @foreach(collect($audiences)->groupBy('group', true) as $group => $items)
-                    <optgroup label="{{ $group }}">
-                        @foreach($items as $key => $item)
-                            <option value="{{ $key }}" {{ $preselect === $key ? 'selected' : '' }}>{{ $item['label'] }}</option>
-                        @endforeach
-                    </optgroup>
-                @endforeach
-            </select>
+            {{-- Teacher: whole class, one class for a subject, whole grade for a subject, all my classes --}}
+            <div x-data="{ pick: @js((string) $preselect), hints: @js(collect($audiences)->map(fn ($i) => $i['hint'] ?? '')->all()) }">
+                <select name="audience" required x-model="pick" class="w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">Select who should receive this</option>
+                    @foreach(collect($audiences)->groupBy('group', true) as $group => $items)
+                        <optgroup label="{{ $group }}">
+                            @foreach($items as $key => $item)
+                                <option value="{{ $key }}">{{ $item['label'] }}</option>
+                            @endforeach
+                        </optgroup>
+                    @endforeach
+                </select>
+
+                <p class="mt-2 text-sm text-ink-muted" x-show="hints[pick]" x-text="hints[pick]" style="display:none"></p>
+            </div>
             @error('audience') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
 
         @elseif(isset($gradeClasses))
@@ -147,6 +163,20 @@
         @error('type') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
     </div>
 
+    {{-- Due date: shown for homework, assignments, projects and tests --}}
+    <div class="mb-6" x-show="dueTypes.includes(type)" style="display:none">
+        <label class="field-label">
+            <span x-text="type === 'test' ? 'Test date' : 'Due date'"></span>
+            <span x-show="dueRequired.includes(type)" class="text-brand-red">*</span>
+            <span x-show="! dueRequired.includes(type)" class="font-normal text-ink-muted">(optional)</span>
+        </label>
+        <input type="date" name="due_date" value="{{ $dueValue }}" min="{{ $minDue }}"
+               :disabled="! dueTypes.includes(type)" :required="dueRequired.includes(type)"
+               class="w-full sm:w-64 rounded-md border-gray-300 shadow-sm">
+        <p class="mt-1 text-xs text-ink-muted">Parents see this in the app under "Due soon" and can tick it off when it's done.</p>
+        @error('due_date') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+    </div>
+
     <div class="mb-6">
         <label class="field-label">Title</label>
         <input type="text" name="title" value="{{ old('title', $announcement->title ?? '') }}" required
@@ -193,7 +223,14 @@
             size(f) { return f.size >= 1048576 ? (f.size / 1048576).toFixed(1) + ' MB' : Math.max(1, Math.round(f.size / 1024)) + ' KB' },
             get tooBig() { return this.files.some(f => f.size > 10 * 1048576) }
          }">
-        <label class="field-label">{{ $editing ? 'Add more files' : 'Attachments' }} <span class="font-normal text-ink-muted">(optional)</span></label>
+        <label class="field-label">
+            {{ $editing ? 'Add more files' : 'Attachments' }}
+            @if($editing)
+                <span class="font-normal text-ink-muted">(optional)</span>
+            @else
+                <span class="font-normal text-ink-muted" x-text="docTypes.includes(type) ? '(required for this type)' : '(optional)'"></span>
+            @endif
+        </label>
 
         <label class="drop" :class="{ 'is-over': over }"
                x-on:dragover.prevent="over = true"

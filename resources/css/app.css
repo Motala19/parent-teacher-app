@@ -1,6 +1,4 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
 
 /* =========================================================
    TOKENS
@@ -551,3 +549,60 @@ a.contact-line:hover { color: var(--rose-from); }
 .tone-skip   { --tone-bg: #fde8ec; --tone-fg: #a3263c; }
 .tone-same   { --tone-bg: #eef1f6; --tone-fg: #3b4a68; }
 .tone-warn   { --tone-bg: #fdf1d6; --tone-fg: #8a5d05; }
+/* =========================================================
+   PHONE APP SHELL
+   ========================================================= */
+html { -webkit-text-size-adjust: 100%; }
+body { -webkit-tap-highlight-color: transparent; }
+
+/* Keep the header clear of the phone's status bar and notch when installed */
+.app-top { padding-top: env(safe-area-inset-top); }
+
+/* Room for the bottom tab bar (parents, below the desktop breakpoint) */
+.has-tabbar { padding-bottom: calc(4.75rem + env(safe-area-inset-bottom)); }
+.has-tabbar .messenger {
+    height: calc(100vh - 15rem);
+    height: calc(100dvh - 15rem - env(safe-area-inset-bottom));
+}
+@media (min-width: 1280px) {
+    .has-tabbar { padding-bottom: 0; }
+    .has-tabbar .messenger { height: calc(100vh - 10rem); height: calc(100dvh - 10rem); }
+}
+
+.tabbar {
+    position: fixed; z-index: 50; left: 0; right: 0; bottom: 0;
+    display: grid; grid-template-columns: repeat(4, 1fr); gap: .25rem;
+    padding: .4rem .5rem calc(.4rem + env(safe-area-inset-bottom));
+    background: rgba(255,255,255,.94); -webkit-backdrop-filter: blur(14px); backdrop-filter: blur(14px);
+    border-top: 1px solid var(--navy-100); box-shadow: 0 -12px 30px -18px rgba(10,26,66,.5);
+}
+.tab {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: .15rem; padding: .4rem 0 .3rem;
+    border-radius: .9rem; font-size: .68rem; font-weight: 700; color: var(--muted);
+    transition: color .2s, background-color .2s, transform .2s var(--ease);
+}
+.tab:active { transform: scale(.94); background: var(--navy-50); }
+.tab.is-active { color: var(--navy-800); }
+.tab.is-active svg { color: var(--rose-from); }
+.tab.is-active::before {
+    content: ""; position: absolute; top: -.4rem; height: 3px; width: 1.7rem; border-radius: 0 0 4px 4px;
+    background: linear-gradient(90deg, var(--rose-from), var(--rose-to));
+}
+.tab .badge-dot { position: absolute; top: .1rem; left: calc(50% + .4rem); box-shadow: 0 0 0 2px #fff; }
+
+/* Bigger touch targets on phones and tablets */
+@media (pointer: coarse) {
+    .btn { min-height: 2.75rem; }
+    .btn-sm { min-height: 2.4rem; }
+    .icon-btn { height: 2.6rem; width: 2.6rem; }
+    .pill, .class-check { min-height: 2.4rem; }
+}
+
+/* 16px inputs stop iPhones zooming the page when a field is tapped */
+@media (max-width: 640px) {
+    input:not([type=checkbox]):not([type=radio]):not([type=file]), select, textarea { font-size: 16px !important; }
+}
+
+@media (display-mode: standalone) {
+    body { overscroll-behavior-y: none; }
+}

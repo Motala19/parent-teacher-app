@@ -13,7 +13,7 @@
 <x-app-layout>
     <x-slot name="header">
         <h2>{{ auth()->user()->school->name }}</h2>
-        <p>School dashboard. Manage people, classes and communication.</p>
+        
     </x-slot>
 
     <div class="py-12">
@@ -78,6 +78,22 @@
                     <a href="{{ route('messages.index') }}" wire:navigate class="tile">
     <span class="tile-icon"><x-icon name="chat" /></span>
     <div><div class="tile-title">Messages</div><div class="tile-sub">Chat with staff and parents</div></div>
+    <x-icon name="arrow" :size="18" class="arrow" />
+
+</a>
+<a href="{{ route('school.announcements.create', ['type' => 'timetable']) }}" wire:navigate class="tile">
+    <span class="tile-icon"><x-icon name="calendar" /></span>
+    <div><div class="tile-title">Upload a timetable</div><div class="tile-sub">Tests, exams or classes</div></div>
+    <x-icon name="arrow" :size="18" class="arrow" />
+</a>
+<a href="{{ route('school.announcements.create', ['type' => 'stationery']) }}" wire:navigate class="tile">
+    <span class="tile-icon"><x-icon name="file" /></span>
+    <div><div class="tile-title">Post a stationery list</div><div class="tile-sub">Per grade</div></div>
+    <x-icon name="arrow" :size="18" class="arrow" />
+</a>
+<a href="{{ route('school.announcements.create', ['type' => 'year_plan']) }}" wire:navigate class="tile">
+    <span class="tile-icon"><x-icon name="layers" /></span>
+    <div><div class="tile-title">Upload the year plan</div><div class="tile-sub">Terms and key dates</div></div>
     <x-icon name="arrow" :size="18" class="arrow" />
 </a>
                 </div>

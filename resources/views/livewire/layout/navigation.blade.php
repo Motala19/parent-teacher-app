@@ -113,7 +113,7 @@ new class extends Component
                     </x-dropdown>
                 </div>
 
-                <div class="-me-2 flex items-center xl:hidden">
+                <div class="-me-2 {{ $me->hasRole('parent') ? 'hidden' : 'flex' }} items-center xl:hidden">
                     <button @click="open = ! open" class="inline-flex items-center justify-center p-2 rounded-xl text-white/80 hover:text-white hover:bg-white/10 focus:outline-none transition">
                         <svg class="h-6 w-6" stroke="currentColor" fill="none" viewBox="0 0 24 24">
                             <path x-show="! open" stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />

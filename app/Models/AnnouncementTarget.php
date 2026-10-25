@@ -9,7 +9,8 @@ class AnnouncementTarget extends Model
 {
     public $timestamps = false;
 
-    protected $fillable = ['announcement_id', 'class_id', 'subject_id'];
+    // class_id = one class, grade = every learner in that grade. subject_id narrows either to one subject.
+    protected $fillable = ['announcement_id', 'class_id', 'grade', 'subject_id'];
 
     public function announcement(): BelongsTo
     {

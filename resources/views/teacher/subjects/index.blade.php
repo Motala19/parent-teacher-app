@@ -40,12 +40,17 @@
                                 <a href="{{ route('teacher.subjects.show', ['subject' => $row->subject->id]) }}" wire:navigate class="btn btn-navy btn-sm">
                                     <x-icon name="users" :size="14" /> View learners
                                 </a>
-                                @if($row->classes->count() === 1)
-                                    <a href="{{ route('teacher.announcements.create', ['audience' => 'subject:' . $row->classes->first()->class->id . ':' . $row->subject->id]) }}"
-                                       wire:navigate class="btn btn-primary btn-sm">
-                                        <x-icon name="megaphone" :size="14" /> Announce
-                                    </a>
-                                @endif
+                                @php
+    $announceKey = $row->grades->count() === 1
+        ? 'grade:' . $row->grades->first() . ':' . $row->subject->id
+        : ($row->classes->count() > 1
+            ? 'all:' . $row->subject->id
+            : 'subject:' . $row->classes->first()->class->id . ':' . $row->subject->id);
+@endphp
+
+<a href="{{ route('teacher.announcements.create', ['audience' => $announceKey]) }}" wire:navigate class="btn btn-primary btn-sm">
+    <x-icon name="megaphone" :size="14" /> Announce
+</a>
                             </div>
                         </div>
                     </div>

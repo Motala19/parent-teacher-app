@@ -3,8 +3,10 @@
 use Illuminate\Support\Facades\Facade;
 use Illuminate\Support\ServiceProvider;
 
-return [
 
+
+return [
+'timezone' => 'Africa/Johannesburg',
     /*
     |--------------------------------------------------------------------------
     | Application Name

@@ -15,9 +15,20 @@ class DashboardController extends Controller
         $children = $user->children()->with(['classRoom.teachers', 'subjects'])->get();
         $classIds = $children->pluck('class_id')->filter()->unique();
 
+        // Latest three only. "View all" opens the full list.
         $announcements = Announcement::with(['user', 'attachments'])
             ->forParent($user)
             ->latest('announcements.published_at')
+            ->take(3)
+            ->get();
+
+        // Homework, assignments, projects and tests still to do
+        $pendingBase  = Announcement::forParent($user)->dueSoon()->notDoneBy($user);
+        $pendingTotal = (clone $pendingBase)->count();
+        $pending      = (clone $pendingBase)
+            ->with('user')
+            ->orderBy('announcements.due_date')
+            ->orderBy('announcements.id')
             ->take(4)
             ->get();
 
@@ -30,6 +41,6 @@ class DashboardController extends Controller
 
         $messageableIds = $user->messageableSchoolStaff()->pluck('users.id')->map(fn ($id) => (int) $id);
 
-        return view('dashboards.parent', compact('children', 'announcements', 'subjectTeachers', 'messageableIds'));
+        return view('dashboards.parent', compact('children', 'announcements', 'pending', 'pendingTotal', 'subjectTeachers', 'messageableIds'));
     }
 }

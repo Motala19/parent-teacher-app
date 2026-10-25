@@ -2,7 +2,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>
         <meta charset="utf-8">
-        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
         <meta name="csrf-token" content="{{ csrf_token() }}">
         <meta name="theme-color" content="#0a1a42">
 
@@ -11,10 +11,14 @@
         <link rel="preconnect" href="https://fonts.bunny.net">
         <link href="https://fonts.bunny.net/css?family=figtree:400,500,600,700,800&display=swap" rel="stylesheet" />
 
+        @include('partials.pwa-head')
+
         @vite(['resources/css/app.css', 'resources/js/app.js'])
     </head>
     <body class="font-sans antialiased">
-        <div class="min-h-screen">
+        @php($isParent = auth()->check() && auth()->user()->hasRole('parent'))
+
+        <div class="min-h-screen {{ $isParent ? 'has-tabbar' : '' }}">
             <div class="app-top {{ isset($header) ? 'has-hero' : '' }}">
                 <livewire:layout.navigation />
 
@@ -33,5 +37,9 @@
                 {{ $slot }}
             </main>
         </div>
+
+        @if($isParent)
+            <x-parent-tabbar />
+        @endif
     </body>
 </html>

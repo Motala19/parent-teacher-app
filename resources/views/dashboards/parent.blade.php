@@ -13,7 +13,7 @@
 
     <div class="py-12">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-8">
-
+        <x-install-app />
             <div class="grid sm:grid-cols-3 gap-4 stagger">
                 <a href="{{ route('parent.announcements.index') }}" wire:navigate class="tile tile-rose">
                     <span class="tile-icon"><x-icon name="megaphone" /></span>

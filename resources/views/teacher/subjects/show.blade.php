@@ -33,15 +33,22 @@
                                class="rounded-md border-gray-300 shadow-sm text-sm">
                         <button type="submit" class="btn btn-ghost btn-sm">Search</button>
                     </form>
-                    @php
+                   @php
     $oneGrade = $grades->count() === 1 ? $grades->first() : null;
     $target   = $grade ?: $oneGrade;
 @endphp
 
-@if($groups->count() > 1)
-    <a href="{{ route('teacher.announcements.create', ['audience' => $target ? 'grade:' . $target . ':' . $subject->id : 'all:' . $subject->id]) }}"
+@if($target)
+    <a href="{{ route('teacher.announcements.create', ['audience' => 'grade:' . $target . ':' . $subject->id]) }}"
        wire:navigate class="btn btn-primary btn-sm">
-        <x-icon name="megaphone" :size="14" /> {{ $target ? 'Announce to ' . $label($target) : 'Announce to all my classes' }}
+        <x-icon name="megaphone" :size="14" /> Announce to whole {{ $label($target) }}
+    </a>
+@endif
+
+@if($groups->count() > 1)
+    <a href="{{ route('teacher.announcements.create', ['audience' => 'all:' . $subject->id]) }}"
+       wire:navigate class="btn btn-ghost btn-sm">
+        <x-icon name="megaphone" :size="14" /> All my classes
     </a>
 @endif
                     <a href="{{ route('messages.index', ['tab' => 'parents']) }}" wire:navigate class="btn btn-navy btn-sm">

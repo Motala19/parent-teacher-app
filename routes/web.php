@@ -1,5 +1,6 @@
 <?php
 
+use Illuminate\Support\Str;
 use App\Http\Controllers\Admin;
 use App\Http\Controllers\AttachmentController;
 use App\Http\Controllers\DirectoryController;
@@ -11,6 +12,40 @@ use App\Http\Controllers\Teacher;
 use Illuminate\Support\Facades\Route;
 
 Route::view('/', 'welcome');
+// Phone app file links (the signature in the URL proves it came from the API)
+Route::get('files/{attachment}', [\App\Http\Controllers\AttachmentController::class, 'signed'])
+    ->middleware('signed')
+    ->name('files.signed');
+
+// Installable app (PWA)
+Route::get('manifest.webmanifest', function () {
+    $name = config('app.name', 'School');
+
+    return response()->json([
+        'id'               => '/',
+        'name'             => $name,
+        'short_name'       => Str::limit($name, 12, ''),
+        'description'      => "Announcements, homework and messages from your child's school.",
+        'start_url'        => '/dashboard?source=pwa',
+        'scope'            => '/',
+        'display'          => 'standalone',
+        'background_color' => '#f3f6fc',
+        'theme_color'      => '#0a1a42',
+        'lang'             => 'en-ZA',
+        'categories'       => ['education'],
+        'icons'            => [
+            ['src' => '/icons/icon-192.png',    'sizes' => '192x192', 'type' => 'image/png', 'purpose' => 'any'],
+            ['src' => '/icons/icon-512.png',    'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'any'],
+            ['src' => '/icons/maskable-512.png', 'sizes' => '512x512', 'type' => 'image/png', 'purpose' => 'maskable'],
+        ],
+        'shortcuts'        => [
+            ['name' => 'Messages',      'url' => '/messages',      'icons' => [['src' => '/icons/icon-192.png', 'sizes' => '192x192']]],
+            ['name' => 'Notifications', 'url' => '/notifications', 'icons' => [['src' => '/icons/icon-192.png', 'sizes' => '192x192']]],
+        ],
+    ], 200, ['Content-Type' => 'application/manifest+json'], JSON_UNESCAPED_SLASHES);
+})->name('pwa.manifest');
+
+Route::view('offline', 'offline')->name('pwa.offline');
 
 Route::get('/dashboard', function () {
     $user = auth()->user();
@@ -27,7 +62,12 @@ Route::middleware(['auth'])->group(function () {
 
     // Attachments (access is checked inside the controller)
     Route::get('attachments/{attachment}', [AttachmentController::class, 'show'])->name('attachments.show');
+        // Log out from the phone app (a plain form post)
+    Route::post('me/logout', function (\App\Livewire\Actions\Logout $logout) {
+        $logout();
 
+        return redirect('/');
+    })->name('me.logout');
     // Notifications (every logged-in user)
     Route::prefix('notifications')->name('notifications.')->group(function () {
         Route::get('/', [NotificationController::class, 'index'])->name('index');
@@ -36,6 +76,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('read-all', [NotificationController::class, 'readAll'])->name('read-all');
         Route::get('{id}/open', [NotificationController::class, 'open'])->name('open');
     });
+
+
 
     // Super Admin (all schools)
     Route::middleware(['role:super-admin'])->prefix('admin')->name('admin.')->group(function () {
@@ -109,10 +151,14 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('announcements', Teacher\AnnouncementController::class)->except('show');
     });
 
-    // Parent
+        // Parent
     Route::middleware(['role:parent'])->prefix('parent')->name('parent.')->group(function () {
         Route::get('dashboard', [ParentPortal\DashboardController::class, 'index'])->name('dashboard');
         Route::get('announcements', [ParentPortal\AnnouncementController::class, 'index'])->name('announcements.index');
+        Route::get('announcements/{announcement}', [ParentPortal\AnnouncementController::class, 'show'])->name('announcements.show');
+        Route::post('announcements/{announcement}/done', [ParentPortal\AnnouncementController::class, 'done_'])->name('announcements.done');
+        Route::delete('announcements/{announcement}/done', [ParentPortal\AnnouncementController::class, 'undone'])->name('announcements.undone');
+        Route::view('me', 'parent.me')->name('me');
     });
 
     // Messages: parents, teachers and school admins

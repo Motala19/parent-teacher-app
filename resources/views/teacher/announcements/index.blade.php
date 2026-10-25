@@ -36,6 +36,9 @@
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2 mb-2">
                                 <span class="badge">{{ $a->typeLabel() }}</span>
+                                @if($a->dueLabel())
+                                <span class="due due-{{ $a->dueState() }}"><x-icon name="calendar" :size="12" /> {{ $a->dueLabel() }}</span>
+                                @endif
                                 <span class="chip">{{ $a->audienceLabel() }}</span>
                                 <span class="text-xs text-ink-muted">{{ $a->created_at->format('d M Y H:i') }}</span>
                             </div>
