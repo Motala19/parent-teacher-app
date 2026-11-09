@@ -35,7 +35,7 @@ class AnnouncementController extends Controller
 
     public function index(Request $request)
     {
-        $announcements = Announcement::with(['user', 'attachments'])
+        $announcements = Announcement::with(['user', 'attachments'])->withCount('views')
             ->where('school_id', $this->schoolId())
             ->when(
                 array_key_exists((string) $request->type, Announcement::TYPES),
@@ -162,5 +162,23 @@ class AnnouncementController extends Controller
 
         return redirect()->route('school.announcements.index')
             ->with('success', 'Announcement and its files deleted.');
+    }
+        // Pin up to three important posts to the top of the parents' lists
+    public function pin(Announcement $announcement)
+    {
+        $this->own($announcement);
+
+        if (! in_array($announcement->audience, ['school', 'classes'], true)) {
+            return back()->with('error', 'Only posts that parents can see can be pinned.');
+        }
+
+        if (! $announcement->is_pinned
+            && Announcement::where('school_id', $this->schoolId())->where('is_pinned', true)->count() >= 3) {
+            return back()->with('error', 'You can pin up to 3 posts. Unpin one first.');
+        }
+
+        $announcement->update(['is_pinned' => ! $announcement->is_pinned]);
+
+        return back()->with('success', $announcement->is_pinned ? 'Pinned to the top for parents.' : 'Unpinned.');
     }
 }

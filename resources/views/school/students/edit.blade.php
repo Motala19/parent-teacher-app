@@ -100,6 +100,8 @@
 
                     <form action="{{ route('school.students.parents.store', $student) }}" method="POST" class="mt-6">
                         @csrf
+
+                        @include('school._conflict')
                         <h4 class="text-sm font-medium text-gray-700 mb-2">Link a parent</h4>
                         <p class="text-xs text-gray-500 mb-3">Email or phone is required. If a parent with the same email or phone exists at your school, they are linked. Otherwise a new account is created.</p>
 

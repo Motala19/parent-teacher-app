@@ -26,6 +26,7 @@ class MySchoolController extends Controller
             'email'   => 'nullable|email',
             'phone'   => 'nullable|string|max:20',
             'address' => 'nullable|string',
+            'short_name' => 'nullable|string|max:12',
         ]);
 
         $this->school()->update($data);

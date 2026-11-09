@@ -81,6 +81,10 @@
                         <p class="text-yellow-800"><strong>{{ $c['parents_skipped'] }}</strong> {{ \Illuminate\Support\Str::plural('parent', $c['parents_skipped']) }} will be skipped (no valid email or phone, or the contact belongs to another school).</p>
                     @endif
 
+                    @if(($c['links_blocked'] ?? 0) > 0)
+                        <p class="text-yellow-800"><strong>{{ $c['links_blocked'] }}</strong> parent {{ \Illuminate\Support\Str::plural('link', $c['links_blocked']) }} will not be made because the learners don't look like siblings (different surname and no shared parent). You can link them by hand afterwards and confirm they are siblings.</p>
+                    @endif
+
                     @if($c['warnings'])
                         <p class="text-yellow-800"><strong>{{ $c['warnings'] }}</strong> {{ \Illuminate\Support\Str::plural('warning', $c['warnings']) }}. See the problems column below.</p>
                     @endif

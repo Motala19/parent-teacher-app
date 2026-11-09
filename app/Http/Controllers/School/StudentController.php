@@ -62,6 +62,7 @@ class StudentController extends Controller
        $students = Student::with(['classRoom', 'parents'])
             ->withCount('parents')
             ->where('school_id', $this->schoolId())
+            ->when($request->boolean('no_parents'), fn ($q) => $q->doesntHave('parents'))
             ->when($request->class_id, fn ($q, $id) => $q->where('class_id', $id))
             ->when($request->search, function ($q, $s) {
                 $q->where(function ($q) use ($s) {

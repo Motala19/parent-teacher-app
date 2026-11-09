@@ -15,6 +15,7 @@ class HomeController extends Controller
     {
         $user = $request->user();
 
+        // Loaded once: used for the child cards and to say which learner each notice is for
         $children = $user->children()->with(['classRoom.teachers', 'subjects'])->get();
         $classIds = $children->pluck('class_id')->filter()->unique();
 
@@ -34,20 +35,22 @@ class HomeController extends Controller
 
         $doneFlag = ['completions as done' => fn ($q) => $q->where('user_id', $user->id)];
 
-        // The three latest notices. The app's "View all" opens the rest.
-        $latest = Announcement::with('user')
+        // The three latest notices (documents live in the School tab)
+        $latest = Announcement::with(['user', 'targets'])
             ->withCount('attachments')
             ->withExists($doneFlag)
             ->forParent($user)
-            ->latest('announcements.published_at')
+            ->notDismissedBy($user)
+            ->notDocuments()
+            ->pinnedFirst()
             ->take(3)
             ->get();
 
         // Homework, assignments, projects and tests still to do
-        $pendingBase  = Announcement::forParent($user)->dueSoon()->notDoneBy($user);
+        $pendingBase  = Announcement::forParent($user)->notDismissedBy($user)->dueSoon()->notDoneBy($user);
         $pendingTotal = (clone $pendingBase)->count();
         $pending      = (clone $pendingBase)
-            ->with('user')
+            ->with(['user', 'targets'])
             ->withCount('attachments')
             ->orderBy('announcements.due_date')
             ->orderBy('announcements.id')
@@ -76,8 +79,8 @@ class HomeController extends Controller
                     ])->values(),
                 ];
             })->values(),
-            'announcements' => $latest->map(fn ($a) => ApiFormat::announcement($a))->values(),
-            'pending'       => $pending->map(fn ($a) => ApiFormat::announcement($a))->values(),
+            'announcements' => $latest->map(fn ($a) => ApiFormat::announcement($a, false, $children))->values(),
+            'pending'       => $pending->map(fn ($a) => ApiFormat::announcement($a, false, $children))->values(),
             'pending_total' => $pendingTotal,
         ]);
     }

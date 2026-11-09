@@ -9,6 +9,30 @@
     $dueValue = old('due_date', $editing ? $announcement->due_date?->toDateString() : '');
     $minDue   = ($editing && $announcement->due_date && $announcement->due_date->isPast()) ? '' : now()->toDateString();
 
+    // The type pills are grouped. Only the types this person may post are shown.
+    $groups = [
+        'School documents' => ['newsletter', 'timetable', 'stationery', 'year_plan'],
+        'Notices'          => ['general', 'urgent', 'event', 'reminder'],
+        'Class work'       => ['homework', 'assignment', 'project', 'test', 'question_paper'],
+    ];
+
+    // Where a parent finds it
+    $where = [
+        'newsletter'     => 'the School tab, under Newsletters',
+        'timetable'      => 'the School tab, under Timetables',
+        'stationery'     => 'the School tab, under Stationery lists',
+        'year_plan'      => 'the School tab, under Year plans',
+        'general'        => 'Notices',
+        'urgent'         => 'Notices (marked urgent)',
+        'event'          => 'Notices',
+        'reminder'       => 'Notices',
+        'homework'       => "Notices and the To do list, with the learner's name",
+        'assignment'     => "Notices and the To do list, with the learner's name",
+        'project'        => "Notices and the To do list, with the learner's name",
+        'test'           => "Notices and the To do list, with the learner's name",
+        'question_paper' => 'Notices',
+    ];
+
     $hints = [
         'newsletter'     => 'Attach your newsletter as a PDF. Parents can read it in the browser or download it.',
         'timetable'      => 'Attach the test, exam or class timetable (PDF or image). Choose the grades or classes it is for.',
@@ -16,7 +40,7 @@
         'year_plan'      => 'Attach the year plan or term calendar as a PDF.',
         'question_paper' => 'Attach the question paper (PDF or Word). Put the subject and date in the title.',
         'assignment'     => 'Attach the assignment sheet and write the instructions in the message. Set the due date below.',
-        'homework'       => 'Attach a worksheet if there is one. Add a due date so it shows in the parents\' Due soon list.',
+        'homework'       => "Attach a worksheet if there is one. Add a due date so it shows in the parents' To do list.",
         'project'        => 'Attach the project brief or rubric if you have one. Set the due date below.',
         'test'           => 'Add the test date so parents can plan. Attach a study guide if you have one.',
     ];
@@ -25,6 +49,7 @@
 <div x-data="{
         type: @js($current),
         hints: @js($hints),
+        where: @js($where),
         dueTypes: @js(\App\Models\Announcement::DUE_TYPES),
         dueRequired: @js(\App\Models\Announcement::DUE_REQUIRED),
         docTypes: @js(\App\Models\Announcement::ADMIN_DOCUMENTS)
@@ -149,17 +174,33 @@
     </div>
 
     <div class="mb-6">
-        <label class="field-label">Type</label>
-        <div class="flex flex-wrap gap-2">
-            @foreach($types as $value => $label)
-                <label>
-                    <input type="radio" name="type" value="{{ $value }}" x-model="type" class="sr-only"
-                           {{ $current == $value ? 'checked' : '' }}>
-                    <span class="pill">{{ $label }}</span>
-                </label>
+        <label class="field-label">What are you posting?</label>
+
+        <div class="space-y-3">
+            @foreach($groups as $title => $keys)
+                @php($available = collect($keys)->filter(fn ($k) => isset($types[$k])))
+
+                @if($available->isNotEmpty())
+                    <div>
+                        <div class="mb-1.5 text-xs font-bold uppercase tracking-wider text-ink-muted">{{ $title }}</div>
+                        <div class="flex flex-wrap gap-2">
+                            @foreach($available as $value)
+                                <label>
+                                    <input type="radio" name="type" value="{{ $value }}" x-model="type" class="sr-only"
+                                           {{ $current == $value ? 'checked' : '' }}>
+                                    <span class="pill">{{ $types[$value] }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             @endforeach
         </div>
-        <p class="mt-2 text-sm text-ink-muted" x-show="hints[type]" x-text="hints[type]" style="display:none"></p>
+
+        <p class="mt-3 text-sm text-ink-muted" x-show="where[type]" style="display:none">
+            When parents receive it, they find it under <strong class="text-ink" x-text="where[type]"></strong>.
+        </p>
+        <p class="mt-1 text-sm text-ink-muted" x-show="hints[type]" x-text="hints[type]" style="display:none"></p>
         @error('type') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
     </div>
 
@@ -173,7 +214,7 @@
         <input type="date" name="due_date" value="{{ $dueValue }}" min="{{ $minDue }}"
                :disabled="! dueTypes.includes(type)" :required="dueRequired.includes(type)"
                class="w-full sm:w-64 rounded-md border-gray-300 shadow-sm">
-        <p class="mt-1 text-xs text-ink-muted">Parents see this in the app under "Due soon" and can tick it off when it's done.</p>
+        <p class="mt-1 text-xs text-ink-muted">Parents see this in the app under "To do", with the name of the learner it is for, and can tick it off when it's done.</p>
         @error('due_date') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
     </div>
 

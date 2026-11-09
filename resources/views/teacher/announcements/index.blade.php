@@ -44,6 +44,7 @@
                             </div>
                             <h3 class="font-bold text-ink">{{ $a->title }}</h3>
                             <p class="mt-1 text-sm text-ink-muted">{{ \Illuminate\Support\Str::limit($a->body, 140) }}</p>
+                            <x-seen-by :a="$a" class="mt-2" />
                         </div>
 
                         <div class="flex items-center gap-2">

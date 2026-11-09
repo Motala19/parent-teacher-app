@@ -167,6 +167,25 @@ class User extends Authenticatable
         return 'dashboard';
     }
 
+        // A parent at this school with the same email or phone number, or null
+    public static function findParentByContact(int $schoolId, ?string $email, ?string $phone): ?self
+    {
+        $email = $email ? strtolower(trim($email)) : null;
+        $phone = static::normalisePhone($phone);
+
+        if (! $email && ! $phone) {
+            return null;
+        }
+
+        return static::role('parent')
+            ->where('users.school_id', $schoolId)
+            ->where(function ($q) use ($email, $phone) {
+                if ($email) $q->orWhere('users.email', $email);
+                if ($phone) $q->orWhere('users.phone', $phone);
+            })
+            ->first();
+    }
+
     /* ---------------------------------------------------------
        Parents: find an existing one or create one
        Returns [parent, temporaryPassword|null]

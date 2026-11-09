@@ -156,4 +156,36 @@ class MessageController extends Controller
 
         return response()->json(ApiFormat::message($message->load(['student', 'attachments']), (int) $me->id), 201);
     }
+
+        // Hide one message from this parent's view. The other person still sees it.
+    public function hideMessage(Request $request, int $id)
+    {
+        $me = (int) $request->user()->id;
+
+        $message = Message::findOrFail($id);
+
+        if ((int) $message->sender_id === $me) {
+            $message->update(['hidden_by_sender' => true]);
+        } elseif ((int) $message->receiver_id === $me) {
+            $message->update(['hidden_by_receiver' => true]);
+        } else {
+            abort(404);
+        }
+
+        return response()->json(['ok' => true]);
+    }
+
+    // Delete the whole conversation for this parent only. Every message is kept in the database.
+    // If the other person writes again, the chat returns with just the new messages.
+    public function hideConversation(Request $request, User $contact)
+    {
+        $me = (int) $request->user()->id;
+
+        abort_unless((int) $contact->school_id === (int) $request->user()->school_id, 404);
+
+        Message::where('sender_id', $me)->where('receiver_id', $contact->id)->update(['hidden_by_sender' => true]);
+        Message::where('sender_id', $contact->id)->where('receiver_id', $me)->update(['hidden_by_receiver' => true, 'is_read' => true]);
+
+        return response()->json(['ok' => true]);
+    }
 }

@@ -118,7 +118,8 @@ Route::middleware(['auth'])->group(function () {
         Route::resource('parents', School\ParentController::class)->except('show');
 
         Route::resource('announcements', School\AnnouncementController::class)->except('show');
-
+        Route::post('announcements/{announcement}/pin', [School\AnnouncementController::class, 'pin'])->name('announcements.pin');
+        
         // Import learners and parents from Excel or CSV
         Route::get('import', [School\ImportController::class, 'index'])->name('import.index');
         Route::get('import/template', [School\ImportController::class, 'template'])->name('import.template');
@@ -152,14 +153,16 @@ Route::middleware(['auth'])->group(function () {
     });
 
         // Parent
-    Route::middleware(['role:parent'])->prefix('parent')->name('parent.')->group(function () {
+        Route::middleware(['role:parent'])->prefix('parent')->name('parent.')->group(function () {
         Route::get('dashboard', [ParentPortal\DashboardController::class, 'index'])->name('dashboard');
         Route::get('announcements', [ParentPortal\AnnouncementController::class, 'index'])->name('announcements.index');
         Route::get('announcements/{announcement}', [ParentPortal\AnnouncementController::class, 'show'])->name('announcements.show');
         Route::post('announcements/{announcement}/done', [ParentPortal\AnnouncementController::class, 'done_'])->name('announcements.done');
         Route::delete('announcements/{announcement}/done', [ParentPortal\AnnouncementController::class, 'undone'])->name('announcements.undone');
         Route::view('me', 'parent.me')->name('me');
-    });
+        Route::post('announcements/clear', [ParentPortal\AnnouncementController::class, 'dismissAll'])->name('announcements.clear');
+        Route::delete('announcements/{announcement}', [ParentPortal\AnnouncementController::class, 'dismiss'])->name('announcements.dismiss');
+        });
 
     // Messages: parents, teachers and school admins
     Route::middleware(['role:teacher|parent|school-admin'])->prefix('messages')->name('messages.')->group(function () {

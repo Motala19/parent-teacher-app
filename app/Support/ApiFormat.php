@@ -6,6 +6,7 @@ use App\Models\Announcement;
 use App\Models\Attachment;
 use App\Models\Message;
 use App\Models\User;
+use Illuminate\Support\Collection;
 
 class ApiFormat
 {
@@ -36,8 +37,9 @@ class ApiFormat
         ];
     }
 
-    // $full = the whole notice (for the open screen). Otherwise a short version for lists.
-    public static function announcement(Announcement $a, bool $full = false): array
+    // $full = the whole notice (for the open screen). $children = the parent's children,
+    // loaded with classRoom and subjects, so the notice can say which learner it is for.
+    public static function announcement(Announcement $a, bool $full = false, ?Collection $children = null): array
     {
         $row = [
             'id'                => $a->id,
@@ -46,12 +48,14 @@ class ApiFormat
             'title'             => $a->title,
             'excerpt'           => $a->excerpt(),
             'audience'          => $a->audienceLabel(),
+            'learners'          => $children ? $a->learnerNames($children) : [],
             'author'            => $a->user?->name,
             'published_at'      => ($a->published_at ?? $a->created_at)->toIso8601String(),
             'due_date'          => $a->due_date?->toDateString(),
             'due_label'         => $a->dueLabel(),
             'due_state'         => $a->dueState(),
             'done'              => (bool) ($a->done ?? false),
+            'pinned'            => (bool) $a->is_pinned,
             'attachments_count' => (int) ($a->attachments_count ?? $a->attachments->count()),
         ];
 

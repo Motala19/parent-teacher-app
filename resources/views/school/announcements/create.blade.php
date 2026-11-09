@@ -1,9 +1,7 @@
-@php($isNewsletter = request('type') === 'newsletter')
-
 <x-app-layout>
     <x-slot name="header">
-        <h2>{{ $isNewsletter ? 'Send Newsletter' : 'Post Announcement' }}</h2>
-        <p>Reach the whole school, whole grades, specific classes, all teachers or just the SMT.</p>
+        <h2>Post announcement</h2>
+        <p>Newsletters, timetables, stationery lists, year plans, notices and class work. Choose the type below.</p>
     </x-slot>
 
     <div class="py-12">
@@ -17,7 +15,7 @@
 
                         <div class="flex gap-3 mt-8">
                             <button type="submit" class="btn btn-primary" :disabled="sending" :class="{ 'opacity-60 cursor-wait': sending }">
-                                <x-icon name="send" :size="16" /> <span x-text="sending ? 'Sending...' : 'Send'"></span>
+                                <x-icon name="send" :size="16" /> <span x-text="sending ? 'Posting...' : 'Post'"></span>
                             </button>
                             <a href="{{ route('school.announcements.index') }}" wire:navigate class="btn btn-ghost">Cancel</a>
                         </div>

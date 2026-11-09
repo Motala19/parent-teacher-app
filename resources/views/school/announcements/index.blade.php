@@ -1,5 +1,6 @@
 @php
-        $order   = ['newsletter', 'timetable', 'stationery', 'year_plan', 'homework', 'assignment', 'project', 'test', 'question_paper', 'reminder', 'event', 'urgent', 'general'];
+    $order   = ['newsletter', 'timetable', 'stationery', 'year_plan', 'homework', 'assignment', 'project', 'test', 'question_paper', 'reminder', 'event', 'urgent', 'general'];
+    $current = request('type');
 @endphp
 
 <x-app-layout>
@@ -14,6 +15,9 @@
             @if(session('success'))
                 <div class="bg-green-100 text-green-800 p-4">{{ session('success') }}</div>
             @endif
+            @if(session('error'))
+                <div class="bg-yellow-100 text-yellow-900 p-4">{{ session('error') }}</div>
+            @endif
 
             <div class="flex flex-wrap items-center justify-between gap-3">
                 <div class="flex flex-wrap gap-2">
@@ -24,14 +28,9 @@
                     @endforeach
                 </div>
 
-                <div class="flex gap-2">
-                    <a href="{{ route('school.announcements.create', ['type' => 'newsletter']) }}" wire:navigate class="btn btn-primary">
-                        <x-icon name="file" :size="16" /> Send Newsletter
-                    </a>
-                    <a href="{{ route('school.announcements.create') }}" wire:navigate class="btn btn-navy">
-                        <x-icon name="plus" :size="16" /> Post
-                    </a>
-                </div>
+                <a href="{{ route('school.announcements.create') }}" wire:navigate class="btn btn-primary">
+                    <x-icon name="plus" :size="16" /> Post announcement
+                </a>
             </div>
 
             @forelse($announcements as $a)
@@ -39,18 +38,26 @@
                     <div class="flex flex-wrap items-start justify-between gap-3">
                         <div class="min-w-0">
                             <div class="flex flex-wrap items-center gap-2 mb-2">
+                                @if($a->is_pinned)<span class="badge" style="--tone-bg:#fff1d6;--tone-fg:#8a5d05">Pinned</span>@endif
                                 <span class="badge">{{ $a->typeLabel() }}</span>
-                                @if($a->dueLabel())
-                                <span class="due due-{{ $a->dueState() }}"><x-icon name="calendar" :size="12" /> {{ $a->dueLabel() }}</span>
-                                @endif
                                 <span class="chip">{{ $a->audienceLabel() }}</span>
+                                @if($a->dueLabel())
+                                    <span class="due due-{{ $a->dueState() }}"><x-icon name="calendar" :size="12" /> {{ $a->dueLabel() }}</span>
+                                @endif
                                 <span class="text-xs text-ink-muted">{{ $a->user->name ?? '-' }} · {{ $a->created_at->format('d M Y H:i') }}</span>
                             </div>
                             <h3 class="font-bold text-ink">{{ $a->title }}</h3>
-                            <p class="mt-1 text-sm text-ink-muted">{{ \Illuminate\Support\Str::limit($a->body, 160) }}</p>
+                            <p class="mt-1 text-sm text-ink-muted">{{ $a->excerpt(160) }}</p>
+                            <x-seen-by :a="$a" class="mt-2" />
                         </div>
 
                         <div class="flex items-center gap-2">
+                            @if(in_array($a->audience, ['school', 'classes'], true))
+                                <form action="{{ route('school.announcements.pin', $a) }}" method="POST">
+                                    @csrf
+                                    <button type="submit" class="btn btn-ghost btn-sm">{{ $a->is_pinned ? 'Unpin' : 'Pin' }}</button>
+                                </form>
+                            @endif
                             <a href="{{ route('school.announcements.edit', $a) }}" wire:navigate class="btn btn-ghost btn-sm">Edit</a>
                             <form action="{{ route('school.announcements.destroy', $a) }}" method="POST"
                                   onsubmit="return confirm('Delete this announcement and its files?')">

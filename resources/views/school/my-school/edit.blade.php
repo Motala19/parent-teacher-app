@@ -22,6 +22,13 @@
                                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
                             @error('name') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
                         </div>
+                                                <div class="mb-4">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">Short name</label>
+                            <input type="text" name="short_name" value="{{ old('short_name', $school->short_name) }}" maxlength="12" placeholder="e.g. MPS"
+                                   class="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500">
+                            <p class="mt-1 text-xs text-gray-500">Used in emails to parents: "...to communicate with <strong>MPS</strong> teachers". Leave empty to use the initials of your school name.</p>
+                            @error('short_name') <p class="text-red-600 text-sm mt-1">{{ $message }}</p> @enderror
+                        </div>
 
                         <div class="mb-4">
                             <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>

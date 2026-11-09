@@ -1,8 +1,11 @@
 @php
-        $order   = ['newsletter', 'timetable', 'stationery', 'year_plan', 'urgent', 'event', 'reminder', 'homework', 'assignment', 'question_paper', 'general'];
+    $order   = ['newsletter', 'timetable', 'stationery', 'year_plan', 'urgent', 'event', 'reminder', 'homework', 'assignment', 'question_paper', 'general'];
     $current = $type ?? null;
 @endphp
-
+@php
+    $types   = \App\Models\Announcement::teacherTypes();
+    $current = request('type');
+@endphp
 <x-app-layout>
     <x-slot name="header">
         <h2>Notices</h2>
@@ -24,10 +27,10 @@
                 <article class="card note card-hover tone-{{ $a->type }} p-6">
                     <div class="flex flex-wrap items-center gap-2 mb-3">
                         <span class="badge">{{ $a->typeLabel() }}</span>
-                        @if($a->dueLabel())
-                        <span class="due due-{{ $a->dueState() }}"><x-icon name="calendar" :size="12" /> {{ $a->dueLabel() }}</span>
-                        @endif
                         <span class="chip">{{ $a->audienceLabel() }}</span>
+                        @if($a->dueLabel())
+                            <span class="due due-{{ $a->dueState() }}"><x-icon name="calendar" :size="12" /> {{ $a->dueLabel() }}</span>
+                        @endif
                     </div>
 
                     <h3 class="text-lg font-bold text-ink">{{ $a->title }}</h3>

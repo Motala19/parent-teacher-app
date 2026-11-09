@@ -30,7 +30,7 @@
                         @endforeach
                     </select>
                     <button type="submit" class="bg-gray-200 hover:bg-gray-300 text-gray-800 px-4 py-2 rounded-md text-sm">Search</button>
-                    @if(request()->hasAny(['search', 'grade', 'class_id']))
+                    @if(request()->hasAny(['search', 'grade', 'class_id', 'no_parents']))
                         <a href="{{ route('school.students.index') }}" class="text-sm text-gray-600 hover:underline">Clear</a>
                     @endif
                 </form>

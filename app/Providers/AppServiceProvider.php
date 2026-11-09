@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use Illuminate\Pagination\Paginator;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Auth\Events\Login;
@@ -25,6 +26,7 @@ class AppServiceProvider extends ServiceProvider
         Event::listen(Login::class, function ($event) {
             $user = $event->user;
             session(['url.intended' => route($user->getDashboardRoute())]);
+            Paginator::defaultView('vendor.pagination.app');
         });
     }
 }

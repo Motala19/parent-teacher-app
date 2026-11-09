@@ -13,6 +13,9 @@ use Illuminate\Support\Str;
 
 class Announcement extends Model
 {
+
+
+
     public const TYPES = [
         'general'        => 'General notice',
         'urgent'         => 'Urgent',
@@ -52,12 +55,15 @@ class Announcement extends Model
         'attachment',
         'is_published',
         'published_at',
+        'is_pinned',
+        'parent_recipients',
     ];
 
     protected $casts = [
         'is_published' => 'boolean',
         'published_at' => 'datetime',
         'due_date'     => 'date',
+        'is_pinned' => 'boolean',
     ];
 
     protected static function booted(): void
@@ -166,6 +172,67 @@ class Announcement extends Model
 
         return $word . ' ' . $this->due_date->format('D j M');
     }
+        // Is this notice meant for this child? Class and grade targets, narrowed by subject when there is one.
+    public function appliesTo(Student $child): bool
+    {
+        if ($this->audience === 'school') {
+            return true;
+        }
+
+        if ($this->audience !== 'classes') {
+            return false;
+        }
+
+        foreach ($this->targets as $t) {
+            $inClass = $t->class_id && (int) $child->class_id === (int) $t->class_id;
+            $inGrade = $t->grade && (
+                (string) $child->grade === (string) $t->grade
+                || (string) ($child->classRoom?->grade ?? '') === (string) $t->grade
+            );
+
+            if (! $inClass && ! $inGrade) {
+                continue;
+            }
+
+            if ($t->subject_id && ! $child->subjects->contains('id', $t->subject_id)) {
+                continue;
+            }
+
+            return true;
+        }
+
+        return false;
+    }
+
+    // The children (a collection loaded with classRoom and subjects) this notice applies to
+    public function childrenFor(Collection $children): Collection
+    {
+        $this->loadMissing('targets');
+
+        return $children->filter(fn ($c) => $this->appliesTo($c))->values();
+    }
+
+    // First names (or full names when two children share a first name) of the children this is for.
+    // Whole-school notices return nothing, because they are for everyone.
+    public function learnerNames(Collection $children): array
+    {
+        if ($this->audience !== 'classes') {
+            return [];
+        }
+
+        $clash = $children->pluck('first_name')->duplicates()->isNotEmpty();
+
+        return $this->childrenFor($children)
+            ->map(fn ($c) => $clash ? $c->first_name . ' ' . $c->last_name : $c->first_name)
+            ->values()
+            ->all();
+    }
+
+    // Timetables, stationery lists and year plans live in the School tab, not the notices feed
+    public function scopeNotDocuments($query)
+    {
+        return $query->whereNotIn('announcements.type', self::ADMIN_DOCUMENTS);
+    }
 
     // Still to do: has a date and it is today, in the future, or less than a few days overdue
     public function scopeDueSoon($query, int $graceDays = 3)
@@ -183,6 +250,17 @@ class Announcement extends Model
               ->from('announcement_completions as ac')
               ->whereColumn('ac.announcement_id', 'announcements.id')
               ->where('ac.user_id', $user->id);
+        });
+    }
+
+        // Hide notices a parent has cleared. Staff and the school admin still see everything.
+    public function scopeNotDismissedBy($query, User $user)
+    {
+        return $query->whereNotExists(function ($q) use ($user) {
+            $q->select(DB::raw(1))
+              ->from('announcement_dismissals as ad')
+              ->whereColumn('ad.announcement_id', 'announcements.id')
+              ->where('ad.user_id', $user->id);
         });
     }
 
@@ -433,5 +511,30 @@ class Announcement extends Model
     public function attachments(): MorphMany
     {
         return $this->morphMany(Attachment::class, 'attachable');
+    }
+
+        public function views(): HasMany
+    {
+        return $this->hasMany(AnnouncementView::class);
+    }
+
+    // "Seen by 42 of 58 parents". Null for posts made before this was counted, or posts with no parents.
+    public function seenSummary(): ?array
+    {
+        $total = (int) $this->parent_recipients;
+
+        if ($total < 1) {
+            return null;
+        }
+
+        $seen = (int) ($this->views_count ?? $this->views()->count());
+
+        return ['seen' => $seen, 'total' => $total, 'percent' => min(100, (int) round($seen / $total * 100))];
+    }
+
+    // Pinned posts first, then newest
+    public function scopePinnedFirst($query)
+    {
+        return $query->orderByDesc('announcements.is_pinned')->orderByDesc('announcements.published_at');
     }
 }

@@ -20,17 +20,7 @@
                     <div><div class="tile-title">Post announcement</div><div class="tile-sub">Homework, projects, reminders</div></div>
                     <x-icon name="arrow" :size="18" class="arrow" />
                 </a>
-                <a href="{{ route('teacher.announcements.create', ['type' => 'question_paper']) }}" wire:navigate class="tile">
-                    <span class="tile-icon"><x-icon name="file" /></span>
-                    <div><div class="tile-title">Send question paper</div><div class="tile-sub">Attach a PDF or Word file</div></div>
-                    <x-icon name="arrow" :size="18" class="arrow" />
-                </a>
-                <a href="{{ route('teacher.announcements.create', ['type' => 'assignment']) }}" wire:navigate class="tile">
-                    <span class="tile-icon"><x-icon name="paperclip" /></span>
-                    <div><div class="tile-title">Post assignment</div><div class="tile-sub">Share the sheet with learners</div></div>
-                    <x-icon name="arrow" :size="18" class="arrow" />
-                </a>
-                <a href="{{ route('messages.index') }}" wire:navigate class="tile">
+                  <a href="{{ route('messages.index') }}" wire:navigate class="tile">
                     <span class="tile-icon"><x-icon name="chat" /></span>
                     <div>
                         <div class="tile-title flex items-center gap-2">Messages @if($unread)<span class="badge-dot">{{ $unread }}</span>@endif</div>
@@ -40,8 +30,8 @@
                 </a>
             </div>
 
-            <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
-                <x-stat-card label="Class teacher of" :value="$classes->count()" icon="layers" />
+                <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 stagger">
+                <x-stat-card label="Classes" :value="$classes->count()" icon="layers" />
                 <x-stat-card label="Subjects" :value="$subjects->count()" icon="book" />
                 <x-stat-card label="Learners I teach" :value="$learners" icon="users" />
                 <x-stat-card label="Unread messages" :value="$unread" icon="chat" tone="rose" />
@@ -95,25 +85,30 @@
                     @endif
                 </div>
 
-                <div class="card overflow-hidden self-start">
+                <                <div class="card overflow-hidden self-start">
                     <div class="panel-head">
-                        <h3>Notices for you</h3>
+                        <h3>Latest notices</h3>
                         <a href="{{ route('teacher.notices.index') }}" wire:navigate class="text-sm font-semibold text-navy-500 hover:text-brand-red transition">View all</a>
                     </div>
+
                     @forelse($notices as $a)
                         <div class="list-row note tone-{{ $a->type }} items-start">
                             <div class="min-w-0 flex-1">
-                                <div class="flex items-center gap-2 mb-1">
+                                <div class="flex flex-wrap items-center gap-2 mb-1">
                                     <span class="badge">{{ $a->typeLabel() }}</span>
-                                    <span class="text-xs text-ink-muted">{{ ($a->published_at ?? $a->created_at)->format('d M Y') }}</span>
+                                    <span class="chip">{{ $a->audienceLabel() }}</span>
+                                    @if($a->dueLabel())<span class="due due-{{ $a->dueState() }}">{{ $a->dueLabel() }}</span>@endif
                                 </div>
                                 <div class="font-semibold text-ink">{{ $a->title }}</div>
-                                <div class="text-sm text-ink-muted">{{ \Illuminate\Support\Str::limit($a->body, 120) }}</div>
-                                <x-attachment-list :attachments="$a->attachments" class="mt-2" />
+                                <div class="text-sm text-ink-muted clamp-2">{{ $a->excerpt(120) }}</div>
+                                <div class="mt-1 flex items-center gap-2 text-xs text-ink-muted">
+                                    {{ $a->user->name ?? 'School' }} · {{ ($a->published_at ?? $a->created_at)->diffForHumans(null, true, true) }}
+                                    @if($a->attachments->isNotEmpty())· <x-icon name="paperclip" :size="12" /> {{ $a->attachments->count() }}@endif
+                                </div>
                             </div>
                         </div>
                     @empty
-                        <x-empty title="No school notices" text="Whole-school announcements and newsletters show up here." icon="bell" />
+                        <x-empty title="No notices yet" text="Announcements addressed to you will show up here." icon="bell" />
                     @endforelse
                 </div>
             </div>

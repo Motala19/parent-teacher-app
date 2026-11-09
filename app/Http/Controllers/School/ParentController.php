@@ -2,10 +2,12 @@
 
 namespace App\Http\Controllers\School;
 
-use App\Jobs\SendParentInvitations;
 use App\Http\Controllers\Controller;
+use App\Jobs\SendParentInvitations;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\ParentLinker;
+use App\Support\Siblings;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Str;
@@ -37,6 +39,11 @@ class ParentController extends Controller
     private function studentRule(): array
     {
         return [Rule::exists('students', 'id')->where('school_id', $this->schoolId())];
+    }
+
+    private function chosen(array $ids)
+    {
+        return Student::where('school_id', $this->schoolId())->whereIn('id', $ids)->get();
     }
 
     public function index(Request $request)
@@ -74,20 +81,24 @@ class ParentController extends Controller
             'student_ids.*' => $this->studentRule(),
         ]);
 
-        [$parent, $temp] = User::findOrCreateParent(
-            $this->schoolId(), $data['name'], $data['email'] ?? null, $data['phone'] ?? null
+        $result = ParentLinker::attach(
+            $this->schoolId(),
+            $data,
+            $this->chosen($data['student_ids'] ?? []),
+            $request->only(['duplicate_choice', 'confirm_siblings'])
         );
 
-        $links = collect($data['student_ids'] ?? [])
-            ->mapWithKeys(fn ($id) => [$id => ['relationship' => $data['relationship']]])
-            ->all();
-        $parent->children()->syncWithoutDetaching($links);
+        if ($result['status'] === 'conflict') {
+            return back()->withInput()->with('conflict', $result['conflict']);
+        }
+
+        $parent = $result['parent'];
 
         return redirect()->route('school.parents.index')
-            ->with('success', $temp
-                ? "Parent {$parent->name} created and linked."
-                : "An existing parent ({$parent->name}) matched this email or phone and was linked.")
-            ->with('temp_password', $temp ? "{$parent->email} / {$temp}" : null);
+            ->with('success', $result['reused']
+                ? "An existing parent ({$parent->name}) was used, so no duplicate was created."
+                : "Parent {$parent->name} created and linked.")
+            ->with('temp_password', $result['temp'] ? "{$parent->email} / {$result['temp']}" : null);
     }
 
     public function edit(User $parent)
@@ -114,6 +125,18 @@ class ParentController extends Controller
             'student_ids.*' => $this->studentRule(),
         ]);
 
+        // Newly ticked learners must be brothers and sisters of the others
+        $selected = $this->chosen($data['student_ids'] ?? []);
+        $pending  = $selected->reject(fn ($s) => $parent->children->contains('id', $s->id));
+
+        if ($pending->isNotEmpty() && $selected->count() > 1 && ! $request->boolean('confirm_siblings')) {
+            $bad = Siblings::unrelated($selected, $pending);
+
+            if ($bad->isNotEmpty()) {
+                return back()->withInput()->with('conflict', ParentLinker::siblingConflict($parent->name, $selected, $bad));
+            }
+        }
+
         $parent->name  = $data['name'];
         $parent->email = ! empty($data['email']) ? strtolower($data['email']) : $parent->email;
         $parent->phone = $data['phone'] ?? null;
@@ -127,14 +150,24 @@ class ParentController extends Controller
 
         // Existing links keep their relationship; newly ticked learners get the chosen one
         $existing = $parent->children->mapWithKeys(fn ($c) => [$c->id => $c->pivot->relationship]);
-        $links = collect($data['student_ids'] ?? [])
-            ->mapWithKeys(fn ($id) => [$id => ['relationship' => $existing->get($id, $data['relationship'])]])
+        $links = $selected
+            ->mapWithKeys(fn ($s) => [$s->id => ['relationship' => $existing->get($s->id, $data['relationship'])]])
             ->all();
         $parent->children()->sync($links);
 
         return redirect()->route('school.parents.index')
             ->with('success', 'Parent updated successfully.')
             ->with('temp_password', $temp ? "{$parent->email} / {$temp}" : null);
+    }
+
+    public function invite(User $parent)
+    {
+        $this->own($parent);
+        abort_unless($parent->realEmail(), 404);
+
+        SendParentInvitations::dispatch([$parent->id], true);
+
+        return back()->with('success', 'An invitation email is on its way to ' . $parent->name . '.');
     }
 
     public function destroy(User $parent)
@@ -146,15 +179,5 @@ class ParentController extends Controller
 
         return redirect()->route('school.parents.index')
             ->with('success', 'Parent deleted successfully.');
-    }
-
-        public function invite(User $parent)
-    {
-        $this->own($parent);
-        abort_unless($parent->realEmail(), 404);
-
-        SendParentInvitations::dispatch([$parent->id], true);
-
-        return back()->with('success', 'An invitation email is on its way to ' . $parent->name . '.');
     }
 }

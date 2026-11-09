@@ -1,3 +1,5 @@
+
+
 <x-app-layout>
     <x-slot name="header">
         <h2>{{ $subject->name }}: teachers</h2>

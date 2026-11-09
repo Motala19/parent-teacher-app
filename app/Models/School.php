@@ -15,7 +15,25 @@ class School extends Model
         'phone',
         'address',
         'is_active',
+        'short_name',
     ];
+
+
+        // "Midrand Primary School" becomes "MPS". Set a short name under My School to override it.
+    public function abbreviation(): string
+    {
+        if ($this->short_name) {
+            return $this->short_name;
+        }
+
+        $skip     = ['the', 'of', 'and', '&'];
+        $initials = collect(preg_split('/\s+/', trim((string) $this->name)))
+            ->reject(fn ($w) => $w === '' || in_array(strtolower($w), $skip, true))
+            ->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))
+            ->join('');
+
+        return $initials !== '' ? $initials : (string) $this->name;
+    }
 
     public function classes(): HasMany
     {

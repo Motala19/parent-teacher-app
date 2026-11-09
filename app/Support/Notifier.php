@@ -51,7 +51,7 @@ class Notifier
         }
     }
 
-    // Notifies everyone who should see the announcement. Returns how many people were notified.
+        // Notifies everyone who should see the announcement. Returns how many people were notified.
     public static function announcement(Announcement $announcement): int
     {
         if (! $announcement->is_published) {
@@ -61,6 +61,13 @@ class Notifier
         $announcement->loadMissing(['user', 'targets']);
 
         $recipients = static::recipients($announcement);
+
+        // Remember how many parents it reached, for "Seen by 42 of 58 parents"
+        (new \Illuminate\Database\Eloquent\Collection($recipients->all()))->load('roles');
+
+        $announcement->forceFill([
+            'parent_recipients' => $recipients->filter(fn ($u) => $u->hasRole('parent'))->count(),
+        ])->save();
 
         foreach ($recipients as $user) {
             $channels = $user->wantsEmail() ? ['database', 'mail'] : ['database'];

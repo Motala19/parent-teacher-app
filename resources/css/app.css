@@ -606,3 +606,108 @@ body { -webkit-tap-highlight-color: transparent; }
 @media (display-mode: standalone) {
     body { overscroll-behavior-y: none; }
 }
+/* =========================================================
+   DUE DATES, DOCUMENTS, TICK-OFF
+   ========================================================= */
+.tone-timetable  { --tone: #1b8fc9; --tone-bg: #e1f1fb; --tone-fg: #0b5f8a; }
+.tone-stationery { --tone: #d1478a; --tone-bg: #fde8f1; --tone-fg: #a3265f; }
+.tone-year_plan  { --tone: #7aa02a; --tone-bg: #e8f0dc; --tone-fg: #4a6b17; }
+
+.due {
+    display: inline-flex; align-items: center; gap: .3rem; padding: .2rem .65rem; border-radius: 9999px;
+    font-size: .72rem; font-weight: 700; white-space: nowrap;
+    color: var(--due-fg, var(--navy-700)); background: var(--due-bg, var(--navy-100));
+}
+.due-overdue { --due-bg: #fde8ec; --due-fg: #a3263c; }
+.due-today   { --due-bg: #fdeadb; --due-fg: #9a4a0b; }
+.due-soon    { --due-bg: #fdf1d6; --due-fg: #8a5d05; }
+.due-later   { --due-bg: #e3ebfb; --due-fg: #1f4096; }
+.due-done    { --due-bg: #e9f8f0; --due-fg: #15683f; }
+
+.check {
+    display: grid; place-items: center; flex-shrink: 0; height: 1.6rem; width: 1.6rem; border-radius: 9999px; cursor: pointer;
+    color: #fff; background: #fff; border: 2px solid var(--navy-200); transition: all .2s var(--ease);
+}
+.check:hover { border-color: var(--rose-from); transform: scale(1.12); }
+.check.is-on { border-color: transparent; background-image: linear-gradient(135deg, var(--rose-from), var(--rose-to)); }
+
+.clamp-2 { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+/* =========================================================
+   SCHOOL SIDE = SAME LOOK AS THE APP
+   ========================================================= */
+
+/* The hero ends in a rounded edge, exactly like the app's header */
+.app-top { border-radius: 0 0 1.75rem 1.75rem; }
+.app-top::after { display: none; }
+
+/* Checkboxes and radios in the brand rose */
+input[type=checkbox], input[type=radio] { color: var(--rose-from); cursor: pointer; }
+input[type=checkbox]:focus, input[type=radio]:focus { --tw-ring-color: rgba(201,72,94,.25); }
+
+/* Leftover default colours */
+.text-green-600 { color: var(--navy-600); }
+.text-green-600:hover { color: var(--rose-from); }
+.text-indigo-600, .text-blue-500 { color: var(--navy-500); }
+.bg-gray-100 { background-color: var(--navy-50); }
+.border-gray-100, .border-gray-200 { border-color: var(--navy-100); }
+.divide-gray-200 > :not([hidden]) ~ :not([hidden]) { border-color: var(--navy-100); }
+
+/* Danger button */
+.btn-danger {
+    color: #fff; background-image: linear-gradient(120deg, #a3263c, var(--rose-from)); background-size: 160% 100%; background-position: 0 0;
+    box-shadow: 0 6px 16px -6px rgba(163,38,60,.6);
+}
+.btn-danger:hover { background-position: 100% 0; transform: translateY(-2px); box-shadow: 0 14px 28px -10px rgba(163,38,60,.75); }
+
+/* Pagination */
+.pg {
+    display: inline-grid; place-items: center; min-width: 2.25rem; height: 2.25rem; padding: 0 .55rem; border-radius: .75rem;
+    font-size: .85rem; font-weight: 700; color: var(--navy-700); background: #fff; border: 1px solid var(--navy-200);
+    transition: all .2s var(--ease);
+}
+a.pg:hover { border-color: var(--navy-500); background: var(--navy-50); transform: translateY(-1px); }
+.pg-on { color: #fff; border-color: transparent; background-image: linear-gradient(120deg, var(--rose-from), var(--rose-to)); box-shadow: 0 8px 16px -8px rgba(201,72,94,.7); }
+.pg-off { color: #b3bdd6; background: var(--navy-50); cursor: default; }
+
+/* Scrollbars and selection match the app */
+* { scrollbar-width: thin; scrollbar-color: var(--navy-200) transparent; }
+::selection { background: rgba(236,127,168,.35); }
+/* "For Sipho": which learner a notice is about */
+.for-chip {
+    display: inline-flex; align-items: center; gap: .3rem; padding: .15rem .65rem; margin-right: .35rem; border-radius: 9999px;
+    font-size: .72rem; font-weight: 800; white-space: nowrap; color: #a3265f; background: #fde8f1;
+}
+/* =========================================================
+   FIELD PADDING: the first letter never touches the edge
+   ========================================================= */
+input:not([type=checkbox]):not([type=radio]):not([type=file]):not([type=range]):not([type=color]),
+select,
+textarea {
+    padding-left: 1rem !important;
+}
+
+input.rounded-full, textarea.rounded-full { padding-left: 1.25rem !important; }
+
+input[type=search] { -webkit-appearance: none; appearance: none; }
+input[type=search]::-webkit-search-decoration,
+input[type=search]::-webkit-search-cancel-button { -webkit-appearance: none; display: none; }
+/* =========================================================
+   ONLY THINGS YOU CAN CLICK REACT TO HOVERING
+   ========================================================= */
+.card-hover:hover { transform: none; box-shadow: var(--shadow-sm); }
+a.card-hover:hover, .card-link:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+
+.stat:hover { transform: none; box-shadow: var(--shadow-sm); }
+.stat:hover .stat-icon { transform: none; }
+a.stat:hover { transform: translateY(-4px); box-shadow: var(--shadow-md); }
+a.stat:hover .stat-icon { transform: rotate(-8deg) scale(1.08); }
+
+.list-row:hover { background: transparent; }
+a.list-row:hover { background: #f6f9ff; }
+
+.card:hover .class-banner::after { transform: none; }
+a.class-banner:hover::after { transform: scale(1.35) translate(-6px, 6px); }
+.seen { display: inline-flex; align-items: center; gap: .4rem; font-size: .75rem; color: var(--muted); }
+.seen strong { color: var(--ink); }
+.seen-bar { width: 3.5rem; height: .35rem; border-radius: 9999px; background: var(--navy-100); overflow: hidden; }
+.seen-bar > span { display: block; height: 100%; border-radius: 9999px; background-image: linear-gradient(90deg, var(--rose-from), var(--rose-to)); }

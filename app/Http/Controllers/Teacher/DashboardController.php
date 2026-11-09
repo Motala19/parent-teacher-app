@@ -25,7 +25,7 @@ class DashboardController extends Controller
             ->forStaff($user)
             ->where('announcements.user_id', '!=', $user->id)
             ->latest('announcements.published_at')
-            ->take(5)
+            ->take(3)
             ->get();
 
         return view('dashboards.teacher', compact('classes', 'subjects', 'learners', 'notices'));

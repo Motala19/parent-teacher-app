@@ -5,6 +5,7 @@ namespace App\Http\Controllers\School;
 use App\Http\Controllers\Controller;
 use App\Models\Student;
 use App\Models\User;
+use App\Support\ParentLinker;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -34,19 +35,24 @@ class StudentParentController extends Controller
             'relationship' => ['required', Rule::in(['mother', 'father', 'guardian', 'other'])],
         ]);
 
-        [$parent, $temp] = User::findOrCreateParent(
-            $this->schoolId(), $data['name'], $data['email'] ?? null, $data['phone'] ?? null
+        $result = ParentLinker::attach(
+            $this->schoolId(),
+            $data,
+            collect([$student]),
+            $request->only(['duplicate_choice', 'confirm_siblings'])
         );
 
-        $student->parents()->syncWithoutDetaching([
-            $parent->id => ['relationship' => $data['relationship']],
-        ]);
+        if ($result['status'] === 'conflict') {
+            return redirect()->route('school.students.edit', $student)
+                ->withInput()
+                ->with('conflict', $result['conflict']);
+        }
 
         return redirect()->route('school.students.edit', $student)
-            ->with('success', $temp
-                ? 'New parent account created and linked.'
-                : "Existing parent {$parent->name} linked to this learner.")
-            ->with('temp_password', $temp ? "{$parent->email} / {$temp}" : null);
+            ->with('success', $result['reused']
+                ? "Existing parent {$result['parent']->name} linked to this learner."
+                : 'New parent account created and linked.')
+            ->with('temp_password', $result['temp'] ? "{$result['parent']->email} / {$result['temp']}" : null);
     }
 
     public function destroy(Student $student, User $parent)

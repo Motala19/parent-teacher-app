@@ -18,6 +18,10 @@ class LearnerImporter
     private array $linked = [];
     private int $planned = 0;
     private string $unusableHash = '';
+        private array $parentStudents = [];  // parent key => [student key => true]
+    private array $studentParents = [];  // student key => [parent key => true]
+    private array $surnames = [];        // student key => surname without spaces or accents
+    private array $studentNames = [];    // student key => "First Last"
 
     public function __construct(private int $schoolId)
     {
@@ -131,6 +135,7 @@ class LearnerImporter
             'parents_skipped'  => 0,
             'links_created'    => 0,
             'links_existing'   => 0,
+            'links_blocked'    => 0,
             'warnings'         => 0,
         ];
 
@@ -205,6 +210,26 @@ class LearnerImporter
             if ($p->phone) {
                 $this->parentsByPhone[$p->phone] = $entry;
             }
+        }
+                // Who is already linked to whom (used to check that shared parents belong to siblings)
+        $this->parentStudents = [];
+        $this->studentParents = [];
+        $this->surnames       = [];
+        $this->studentNames   = [];
+
+        $links = DB::table('parent_student')
+            ->join('students', 'students.id', '=', 'parent_student.student_id')
+            ->where('students.school_id', $this->schoolId)
+            ->get(['parent_student.user_id', 'parent_student.student_id', 'students.first_name', 'students.last_name']);
+
+        foreach ($links as $l) {
+            $sk = 's' . $l->student_id;
+            $pk = (string) $l->user_id;
+
+            $this->studentParents[$sk][$pk] = true;
+            $this->parentStudents[$pk][$sk] = true;
+            $this->surnames[$sk]            = Siblings::surname($l->last_name);
+            $this->studentNames[$sk]        = $l->first_name . ' ' . $l->last_name;
         }
     }
 
@@ -324,8 +349,9 @@ class LearnerImporter
                 continue;
             }
 
-            // Link the parent to the learner
-            $pair   = ($ref['id'] ? 's' . $ref['id'] : 'n' . $key) . '|' . $entry['key'];
+                        // Link the parent to the learner
+            $sk     = $ref['id'] ? 's' . $ref['id'] : 'n' . $key;
+            $pair   = $sk . '|' . $entry['key'];
             $exists = isset($this->linked[$pair]);
 
             if (! $exists && $ref['id'] && $entry['id']) {
@@ -335,7 +361,27 @@ class LearnerImporter
                     ->exists();
             }
 
-            $this->linked[$pair] = true;
+            $this->studentNames[$sk] = $first . ' ' . $last;
+            $this->surnames[$sk]     = Siblings::surname($last);
+
+            // Parents are only shared between brothers and sisters
+            if (! $exists) {
+                $others = array_values(array_diff(array_keys($this->parentStudents[$entry['key']] ?? []), [$sk]));
+
+                if ($others && ! $this->related($sk, $others)) {
+                    $names = collect($others)->map(fn ($o) => $this->studentNames[$o] ?? 'another learner')->take(3)->join(', ');
+
+                    $result['warnings'][] = "{$p['name']} was not linked to {$first} {$last}: they are already linked to {$names}, who does not look like a sibling (different surname and no shared parent). Link them from the learner's page to confirm.";
+                    $counts['links_blocked']++;
+                    $result['parents'][] = ['name' => $p['name'], 'contact' => $display, 'relationship' => $p['relationship'], 'action' => 'skipped', 'link' => null];
+
+                    continue;
+                }
+            }
+
+            $this->linked[$pair]                      = true;
+            $this->parentStudents[$entry['key']][$sk] = true;
+            $this->studentParents[$sk][$entry['key']] = true;
 
             if ($exists) {
                 $counts['links_existing']++;
@@ -359,6 +405,25 @@ class LearnerImporter
         }
 
         return $result;
+    }
+        // Is this learner related to any of the others? (same surname, or a shared parent)
+    private function related(string $sk, array $others): bool
+    {
+        $mine = array_keys($this->studentParents[$sk] ?? []);
+
+        foreach ($others as $o) {
+            $theirSurname = $this->surnames[$o] ?? '';
+
+            if ($theirSurname !== '' && $theirSurname === ($this->surnames[$sk] ?? null)) {
+                return true;
+            }
+
+            if (array_intersect($mine, array_keys($this->studentParents[$o] ?? []))) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     // Returns null when the row has no data for this parent

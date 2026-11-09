@@ -151,7 +151,7 @@ class AnnouncementController extends Controller
 
     public function index(Request $request)
     {
-        $announcements = Announcement::with('attachments')
+        Announcement::with('attachments')->withCount('views')
             ->where('user_id', auth()->id())
             ->when(
                 array_key_exists((string) $request->type, Announcement::teacherTypes()),

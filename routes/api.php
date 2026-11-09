@@ -13,19 +13,25 @@ Route::prefix('v1')->group(function () {
         Route::get('home', V1\HomeController::class);
 
         Route::get('announcements', [V1\AnnouncementController::class, 'index']);
+        Route::post('announcements/clear', [V1\AnnouncementController::class, 'dismissAll']);
         Route::get('announcements/{id}', [V1\AnnouncementController::class, 'show'])->whereNumber('id');
+        Route::delete('announcements/{id}', [V1\AnnouncementController::class, 'dismiss'])->whereNumber('id');
         Route::post('announcements/{id}/done', [V1\AnnouncementController::class, 'done'])->whereNumber('id');
         Route::delete('announcements/{id}/done', [V1\AnnouncementController::class, 'undone'])->whereNumber('id');
         Route::get('pending', [V1\AnnouncementController::class, 'pending']);
 
         Route::get('notifications', [V1\NotificationController::class, 'index']);
         Route::post('notifications/read-all', [V1\NotificationController::class, 'readAll']);
+        Route::delete('notifications', [V1\NotificationController::class, 'clear']);
         Route::post('notifications/{id}/read', [V1\NotificationController::class, 'read']);
+        Route::delete('notifications/{id}', [V1\NotificationController::class, 'destroy']);
 
         Route::get('contacts', [V1\MessageController::class, 'contacts']);
         Route::get('conversations', [V1\MessageController::class, 'index']);
         Route::get('conversations/{contact}', [V1\MessageController::class, 'show']);
+        Route::delete('conversations/{contact}', [V1\MessageController::class, 'hideConversation']);
         Route::post('conversations/{contact}', [V1\MessageController::class, 'store'])->middleware('throttle:30,1');
+        Route::delete('messages/{id}', [V1\MessageController::class, 'hideMessage'])->whereNumber('id');
 
         Route::get('attachments/{attachment}/link', [V1\AttachmentController::class, 'link']);
     });

@@ -15,24 +15,25 @@ class DashboardController extends Controller
         $children = $user->children()->with(['classRoom.teachers', 'subjects'])->get();
         $classIds = $children->pluck('class_id')->filter()->unique();
 
-        // Latest three only. "View all" opens the full list.
-        $announcements = Announcement::with(['user', 'attachments'])
+        // Latest three only (documents live under "School documents"). "View all" opens the rest.
+        $announcements = Announcement::with(['user', 'attachments', 'targets'])
             ->forParent($user)
-            ->latest('announcements.published_at')
+            ->notDismissedBy($user)
+            ->notDocuments()
+           ->pinnedFirst()
             ->take(3)
             ->get();
 
         // Homework, assignments, projects and tests still to do
-        $pendingBase  = Announcement::forParent($user)->dueSoon()->notDoneBy($user);
+        $pendingBase  = Announcement::forParent($user)->notDismissedBy($user)->dueSoon()->notDoneBy($user);
         $pendingTotal = (clone $pendingBase)->count();
         $pending      = (clone $pendingBase)
-            ->with('user')
+            ->with(['user', 'targets'])
             ->orderBy('announcements.due_date')
             ->orderBy('announcements.id')
             ->take(4)
             ->get();
 
-        // "classId-subjectId" => the teacher who teaches that subject in that class
         $subjectTeachers = ClassSubject::with('teacher')
             ->whereIn('class_id', $classIds)
             ->whereNotNull('teacher_id')
